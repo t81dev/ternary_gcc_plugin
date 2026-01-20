@@ -1,0 +1,47 @@
+# Build artifacts
+*.o
+*.so
+*.dylib
+*.a
+*.exe
+
+# GCC plugin
+ternary_plugin.so
+
+# Runtime
+runtime/*.o
+runtime/ternary_runtime.o
+
+# Test executables
+test_ternary
+test_abi
+test_promotion
+test_no_ternary
+test_edge_cases
+benchmark
+
+# Build directories
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temp
+*.log
+*.tmp
+
+# Release artifacts
+release/

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Wrapper script to enable ternary plugin with -fternary flag
+
+PLUGIN_DIR="$(dirname "$0")"
+GCC=gcc-15  # Adjust as needed
+
+if [[ "$1" == "-fternary" ]]; then
+    shift
+    exec $GCC -fplugin="$PLUGIN_DIR/ternary_plugin.so" \
+             -fplugin-arg-ternary_plugin-lower \
+             -fplugin-arg-ternary_plugin-arith \
+             -fplugin-arg-ternary_plugin-logic \
+             -fplugin-arg-ternary_plugin-cmp \
+             -fplugin-arg-ternary_plugin-types \
+             -I"$PLUGIN_DIR/include" \
+             "$@"
+else
+    exec $GCC "$@"
+fi

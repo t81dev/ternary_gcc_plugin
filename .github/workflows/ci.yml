@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        gcc-version: [9, 11]
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install GCC ${{ matrix.gcc-version }}
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-${{ matrix.gcc-version }} g++-${{ matrix.gcc-version }}
+        echo "CC=gcc-${{ matrix.gcc-version }}" >> $GITHUB_ENV
+        echo "CXX=g++-${{ matrix.gcc-version }}" >> $GITHUB_ENV
+
+    - name: Install GCC ${{ matrix.gcc-version }}
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install gcc@${{ matrix.gcc-version }}
+        echo "CC=gcc-${{ matrix.gcc-version }}" >> $GITHUB_ENV
+        echo "CXX=g++-${{ matrix.gcc-version }}" >> $GITHUB_ENV
+
+    - name: Build Plugin
+      run: make
+
+    - name: Build Runtime
+      run: |
+        gcc -Iinclude -c runtime/ternary_runtime.c -o ternary_runtime.o
+
+    - name: Run Tests
+      run: |
+        cd tests
+        chmod +x run_tests.sh
+        ./run_tests.sh
+        # Compile ABI test
+        gcc -I../include -c test_abi.c -o test_abi.o
+        gcc test_abi.o ../runtime/ternary_runtime.o -o test_abi
+        ./test_abi
+        # Compile promotion test
+        gcc -fplugin=../ternary_plugin.so -fplugin-arg-ternary_plugin-types -I../include -c test_promotion.c -o test_promotion.o
+        gcc test_promotion.o -o test_promotion
+        ./test_promotion
+        # Sanity check
+        gcc -c test_no_ternary.c -o test_no_ternary.o
+        # Run benchmark
+        gcc -I../include -c benchmark.c -o benchmark.o
+        gcc benchmark.o ../runtime/ternary_runtime.o -o benchmark
+        ./benchmark
+        # Edge cases
+        gcc -I../include -c test_edge_cases.c -o test_edge_cases.o
+        gcc test_edge_cases.o ../runtime/ternary_runtime.o -o test_edge_cases
+        ./test_edge_cases
