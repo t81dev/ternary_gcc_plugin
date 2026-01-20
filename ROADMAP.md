@@ -1,13 +1,14 @@
 # Ternary GCC Plugin Roadmap
 
 This roadmap focuses on getting a usable, testable ternary toolchain surfaced
-through a GCC plugin, with a stable ABI and runtime.
+through a GCC plugin, with a stable ABI and runtime on binary substrates.
 
 ## Phase 0: Baseline and Scope Lock
 
 - Define supported GCC versions and host platforms.
 - Freeze the ternary ABI surface (type sizes, packing, calling convention).
 - Decide on ternary XOR semantics and rounding rules for conversions.
+- Confirm the software-first contract (helpers as reference semantics).
 
 Deliverables:
 - ABI section in `SPECIFICATION.md` finalized.
@@ -18,6 +19,7 @@ Deliverables:
 - Implement `__ternary_*` functions referenced by the plugin.
 - Provide a portable reference implementation in C/C++.
 - Define headers for builtins and public API.
+- Add container helpers for t6/t12/t24 and a plan for larger widths.
 
 Deliverables:
 - `lib/` or `runtime/` with source and headers.
@@ -28,6 +30,7 @@ Deliverables:
 - Add user-facing types/macros and builtins in `include/ternary_plugin.h`.
 - Define how ternary literals and casts are written in C/C++.
 - Validate type promotion and conversion rules.
+- Lock down exact condition type handling in helper signatures.
 
 Deliverables:
 - Updated header APIs and example usage in `README.md`.
@@ -83,7 +86,17 @@ Deliverables:
 - Compatibility matrix in `README.md`.
 - ABI validation step in CI.
 
-## Phase 8: Extensions (Optional)
+## Phase 8: Optional Hardware Backend
+
+- Define an ISA encoding that preserves the helper ABI semantics.
+- Add a codegen path that targets the hardware mnemonics.
+- Provide a fallback mechanism to the helper runtime when unavailable.
+
+Deliverables:
+- Hardware backend design note and prototype.
+- Compatibility tests against the helper ABI.
+
+## Phase 9: Extensions (Optional)
 
 - Vector/packed ternary operations.
 - Ternary-aware optimizations (strength reduction, peepholes).

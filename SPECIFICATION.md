@@ -3,17 +3,26 @@
 ## Overview
 
 This specification defines a balanced-ternary execution model, a minimal ISA surface
-that matches binary capabilities, and a GCC plugin/toolchain contract for lowering
-ternary operations from C/C++. The goal is parity with binary systems: any computation
-expressible in binary should be expressible and performant in ternary.
+implemented as a conservative extension over binary substrates, and a GCC
+plugin/toolchain contract for lowering ternary operations from C/C++. The goal is
+parity with binary systems: any computation expressible in binary should be
+expressible and performant in ternary, without requiring ternary hardware.
 
 ## Design Goals
 
 - Balanced ternary with trits in {-1, 0, +1}.
 - Binary-addressed memory for compatibility.
+- Binary containers as the canonical storage and ABI transport.
 - IEEE binary floating point preserved (ternary integer ops only for now).
 - Deterministic mapping to C/C++ semantics.
 - Stable ABI for helper functions and builtins.
+
+## Conservative Extension Model
+
+The ternary ISA is a virtual contract layered over a binary machine model. All
+ternary values are represented in binary containers with a defined packing, and
+all operations must have a correct software implementation. Hardware ISA support
+is optional and may accelerate the same contract without changing semantics.
 
 ## Numeric Model
 
@@ -59,7 +68,9 @@ bit patterns across loads/stores and calls.
 
 Condition values are trits. Comparisons produce {-1, 0, +1}. Branches and selects
 treat 0 as false and non-zero as true. C/C++ condition values are lowered to the
-exact integral type used in source unless otherwise specified.
+ternary condition ABI type (ternary_cond_t). The plugin lowers condition
+expressions to ternary_cond_t before helper calls; packed ternary conditions are
+decoded with tt2b first.
 
 ### Floating Point
 
@@ -107,15 +118,60 @@ shift is arithmetic in balanced ternary (preserves sign in the ternary sense).
 - tt2b: ternary logical value to binary container
 - t2f / f2t: ternary integer <-> IEEE float conversions (f2t rounds toward zero)
 
+## Ternary Arithmetic Unit (TAU) Opcodes
+
+This section enumerates ternary-native opcodes expected for a TAU. These are not
+reused binary opcodes; they operate on trits or ternary values directly and are
+intended to be exposed via the GCC plugin and helper ABI.
+
+### Core Tritwise Ops
+
+- tnot: tritwise inversion (-1 <-> +1, 0 -> 0)
+- tand: per-trit min(a, b)
+- tor: per-trit max(a, b)
+- txor: ternary XOR (ISA-defined and stable)
+- tmin: per-trit minimum (alias of tand, optional)
+- tmax: per-trit maximum (alias of tor, optional)
+
+### Ternary Arithmetic (Value Ops)
+
+- tadd: ternary add
+- tsub: ternary subtract
+- tmul: ternary multiply
+- tdiv: ternary divide (division by zero returns 0)
+- tmod: ternary modulo (division by zero returns 0)
+- tneg: unary negate
+- tabs: absolute value (optional helper if not encoded in hardware)
+
+### Ternary Comparison and Condition Ops
+
+- tcmp: ternary compare returning {-1, 0, +1}
+- tsel: select with ternary condition (cond != 0)
+- tcmpz: compare against zero, returning {-1, 0, +1} (optional shortcut)
+
+### Trit Shifts and Rotates
+
+- tshl: shift left by trits, fill with 0
+- tshr: arithmetic shift right by trits
+- trol: rotate left by trits
+- tror: rotate right by trits
+
+### Ternary Normalization and Conversion
+
+- tclamp: clamp each trit to {-1, 0, +1} (for sanitize/repair)
+- tnorm: normalize packed representation to canonical form
+- tb2t: binary container to ternary logical value
+- tt2b: ternary logical value to binary container
+
 ## Ternary Base ISA v0
 
-This section defines a software-visible ISA contract. Encodings are intentionally
-left open, but operand formats and semantics are fully specified. The ISA operates
-on packed 2-bit trits, using the encoding 00 = -1, 01 = 0, 10 = +1, 11 = reserved.
+This section defines a virtual ISA contract. Encodings are intentionally left open,
+but operand formats and semantics are fully specified. The ISA operates on packed
+2-bit trits, using the encoding 00 = -1, 01 = 0, 10 = +1, 11 = reserved.
 
 ### Operand Types
 
-- Tn: ternary integer register (packed trits, 2 bits per trit).
+- Tn: ternary integer register (logical value, stored as packed trits).
 - Rn: binary integer register (for addresses and binary containers).
 - Fn: IEEE floating-point register (f32/f64).
 - Imm: immediate value (binary-encoded).
@@ -198,9 +254,9 @@ Control flow uses ternary conditions:
 
 ### Software Mapping
 
-In the absence of hardware support, the ISA mnemonics are mapped to helper calls
-in C. The helper ABI mirrors the instruction set and operates on packed trit
-containers using the 2-bit encoding.
+The ISA mnemonics are always defined in terms of helper semantics over packed
+binary containers. Hardware support, if present, must be bit-for-bit compatible
+with the helper ABI.
 
 ## Memory Model
 
@@ -236,7 +292,8 @@ Return ternary integers in designated ternary register or integer container regi
 ### Varargs
 
 Varargs are passed using binary containers. The callee interprets the container based
-on the promoted ternary type.
+on the promoted ternary type. The helper headers provide TERNARY_VA_ARG_T6/T12/T24
+macros to decode promotions for packed ternary types.
 
 ## Toolchain Contract
 
@@ -296,9 +353,9 @@ Helper functions implement ISA-visible operations in C:
 - __ternary_t2f32(a) / __ternary_t2f64(a)
 - __ternary_f2t32(a) / __ternary_f2t64(a)
 
-cond_t must match the exact condition type used at the call site. The helper header
-should expose a macro to select cond_t (default: bool). The reference helper header
-uses a packed 2-bit trit encoding (00 = -1, 01 = 0, 10 = +1).
+cond_t is ternary_cond_t (default: int64_t). The plugin lowers conditions to
+ternary_cond_t before calling helpers. The reference helper header uses a packed
+2-bit trit encoding (00 = -1, 01 = 0, 10 = +1).
 
 ### GCC Plugin Behavior
 
@@ -323,18 +380,18 @@ uses a packed 2-bit trit encoding (00 = -1, 01 = 0, 10 = +1).
 ### Completed Features
 - GCC plugin infrastructure with GIMPLE pass registration
 - Extended arithmetic builtin lowering (add, sub, mul, div, mod, neg)
-- Logic builtin lowering (not)
+- Logic builtin lowering (not, and, or, xor)
 - Comparison builtin lowering (cmp)
 - Helper function ABI with packed C implementations for testing
 - Test suite covering all implemented operations
 - Builtin ternary type registration (t6_t, t12_t, t24_t, t48_t, t96_t, t192_t)
+- Shift/rotate builtin lowering (t6/t12/t24)
+- Conversion builtin lowering (tb2t, tt2b, t2f, f2t)
 
 ### Known Limitations
 - GCC 15 API compatibility may still require adjustments
-- Placeholder ISA instructions (tsel, tadd, tmul, etc.) not implemented in hardware
-- No ternary logic operations beyond 'not' (tand, tor, txor not implemented)
-- No shift/rotate operations
-- No conversion operations (tb2t, tt2b, t2f/f2t)
+- Packed ternary helpers currently cover t6/t12/t24 only (no big-int support for t48+)
+- Reference runtime/helpers do not implement t48/t96/t192 operations
 
 ## Future Extensions
 
@@ -351,36 +408,31 @@ uses a packed 2-bit trit encoding (00 = -1, 01 = 0, 10 = +1).
 1. Custom ternary types
    - Implemented: builtin types t6, t12, t24, t48, t96, t192 (packed 2-bit trits)
    - Implemented: storage ABI for 2-bit trit packing
-   - Remaining: helper typedefs for t48/t96/t192 if needed for C-only testing
+   - Remaining: helper/runtime support for t48/t96/t192 (requires big-int support)
 2. Extended arithmetic operations
    - Implemented: tsub, tdiv, tmod, tneg builtins and helpers
-   - Remaining: hardware ISA backing for these mnemonics
+   - Remaining: validation coverage for edge cases and larger widths
 3. Ternary logic operations
    - Implemented: tand, tor, txor builtins and helpers (min/max/xor semantics)
-   - Remaining: hardware ISA backing for these mnemonics
+   - Remaining: validation coverage for edge cases and larger widths
 4. Comparison operations
    - Implemented: tcmp builtins and helpers (-1/0/+1)
-   - Remaining: hardware ISA backing for these mnemonics
+   - Remaining: validation coverage for edge cases and larger widths
 5. Shifts and rotates
-   - Implemented: trit-based shl/shr/rol/ror builtins and helpers
-   - Remaining: hardware ISA backing for these mnemonics
+   - Implemented: trit-based shl/shr/rol/ror builtins and helpers (t6/t12/t24)
+   - Remaining: validation coverage and larger width support
 6. Type conversions
-   - Implemented: tb2t/tt2b and t2f/f2t builtins and helpers
-   - Remaining: hardware ISA backing and precise rounding semantics
-7. Exact condition type handling
-   - Issue: Helpers use fixed TERNARY_COND_T (defaults to bool)
-   - Required: Condition type must match exact type used at call site
-   - Impact: ABI compatibility issues
-8. Varargs support
-   - Missing: Handling of ternary types in varargs
-   - Impact: Functions with variable arguments won't work with ternary types
-9. Full ISA integration
+   - Implemented: tb2t/tt2b and t2f/f2t builtins and helpers (t6/t12/t24)
+   - Remaining: precise rounding semantics for larger widths
+7. Full ISA integration
    - Missing: Complete mapping to all specified ISA instructions
    - Missing: Proper register allocation and calling conventions for ternary types
+8. Optional hardware backend
+   - Missing: ISA encoding and codegen path for acceleration
+   - Non-blocking: software helpers remain the reference
 
 ## Priority Order
 
-- High: Hardware ISA support for ternary mnemonics
-- High: Exact condition type handling in helpers
-- Medium: Varargs support for ternary types
-- Low: Helper typedefs for larger ternary widths (t48/t96/t192)
+- High: Helper support for larger ternary widths (t48/t96/t192)
+- Medium: Varargs ABI validation tests for ternary types
+- Low: Optional hardware ISA support for ternary mnemonics

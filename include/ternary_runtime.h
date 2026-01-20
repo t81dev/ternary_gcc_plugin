@@ -2,18 +2,15 @@
 #define TERNARY_RUNTIME_H
 
 #include <stdint.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #ifndef TERNARY_COND_T
-#ifdef __cplusplus
-#define TERNARY_COND_T bool
-#else
-#include <stdbool.h>
-#define TERNARY_COND_T bool
-#endif
+typedef int64_t ternary_cond_t;
+#define TERNARY_COND_T ternary_cond_t
 #endif
 
 #ifndef TERNARY_USE_BUILTIN_TYPES
@@ -21,6 +18,13 @@ typedef uint16_t t6_t;   /* 6 trits -> 12 bits */
 typedef uint32_t t12_t;  /* 12 trits -> 24 bits */
 typedef uint64_t t24_t;  /* 24 trits -> 48 bits */
 #endif
+
+/* Varargs helpers for ternary packed types. */
+#define TERNARY_VA_ARG_T6(ap) ((t6_t)va_arg(ap, int))
+#define TERNARY_VA_ARG_T12(ap) ((t12_t)va_arg(ap, uint32_t))
+#define TERNARY_VA_ARG_T24(ap) ((t24_t)va_arg(ap, uint64_t))
+
+/* Note: t48/t96/t192 helpers are not provided in this header. */
 
 /* Select helpers for standard types. */
 int __ternary_select_i8(TERNARY_COND_T cond, int true_val, int false_val);

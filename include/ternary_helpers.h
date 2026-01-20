@@ -7,21 +7,19 @@
  */
 
 #include <stdint.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #ifndef TERNARY_COND_T
-#ifdef __cplusplus
-#define TERNARY_COND_T bool
-#else
-#include <stdbool.h>
-#define TERNARY_COND_T bool
-#endif
+typedef int64_t ternary_cond_t;
+#define TERNARY_COND_T ternary_cond_t
 #endif
 
-/* TERNARY_COND_T should match the exact condition type used at the call site.
+/* TERNARY_COND_T defines the ABI condition type for select helpers.
+ * The plugin lowers conditions to this type before helper calls.
  * Non-zero values are treated as true by the select helpers.
  */
 
@@ -118,6 +116,9 @@ static inline uint64_t ternary_tritwise_op(uint64_t a, uint64_t b, unsigned trit
 
 static inline uint64_t ternary_shift_left(uint64_t packed, unsigned trit_count, unsigned shift) {
     uint64_t out = 0;
+    if (trit_count == 0)
+        return packed;
+    shift %= trit_count;
     for (unsigned i = 0; i < trit_count; ++i) {
         int trit = 0;
         if (i >= shift)
@@ -129,6 +130,9 @@ static inline uint64_t ternary_shift_left(uint64_t packed, unsigned trit_count, 
 
 static inline uint64_t ternary_shift_right(uint64_t packed, unsigned trit_count, unsigned shift) {
     uint64_t out = 0;
+    if (trit_count == 0)
+        return packed;
+    shift %= trit_count;
     int sign_trit = ternary_get_trit(packed, trit_count - 1);
     for (unsigned i = 0; i < trit_count; ++i) {
         int trit = sign_trit;
@@ -315,6 +319,13 @@ typedef uint32_t t12_t;  /* 12 trits -> 24 bits */
 typedef uint64_t t24_t;  /* 24 trits -> 48 bits */
 #endif
 
+/* Varargs helpers for ternary packed types. */
+#define TERNARY_VA_ARG_T6(ap) ((t6_t)va_arg(ap, int))
+#define TERNARY_VA_ARG_T12(ap) ((t12_t)va_arg(ap, uint32_t))
+#define TERNARY_VA_ARG_T24(ap) ((t24_t)va_arg(ap, uint64_t))
+
+/* Note: t48/t96/t192 helpers are not provided in this header. */
+
 /* Ternary type select operations */
 
 /* t6 selects */
@@ -412,7 +423,7 @@ static inline int __ternary_div(int a, int b) {
     );
     return result;
 #else
-    return a / b;
+    return (b == 0) ? 0 : (a / b);
 #endif
 }
 
@@ -426,7 +437,7 @@ static inline int __ternary_mod(int a, int b) {
     );
     return result;
 #else
-    return a % b;
+    return (b == 0) ? 0 : (a % b);
 #endif
 }
 

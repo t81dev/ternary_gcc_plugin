@@ -103,6 +103,9 @@ static uint64_t ternary_tritwise_op(uint64_t a, uint64_t b, unsigned trit_count,
 static uint64_t ternary_shift_left(uint64_t packed, unsigned trit_count, unsigned shift)
 {
     uint64_t out = 0;
+    if (trit_count == 0)
+        return packed;
+    shift %= trit_count;
     for (unsigned i = 0; i < trit_count; ++i) {
         int trit = 0;
         if (i >= shift)
@@ -115,6 +118,9 @@ static uint64_t ternary_shift_left(uint64_t packed, unsigned trit_count, unsigne
 static uint64_t ternary_shift_right(uint64_t packed, unsigned trit_count, unsigned shift)
 {
     uint64_t out = 0;
+    if (trit_count == 0)
+        return packed;
+    shift %= trit_count;
     int sign_trit = ternary_get_trit(packed, trit_count - 1);
     for (unsigned i = 0; i < trit_count; ++i) {
         int trit = sign_trit;
@@ -244,12 +250,12 @@ int __ternary_sub(int a, int b)
 
 int __ternary_div(int a, int b)
 {
-    return a / b;
+    return (b == 0) ? 0 : (a / b);
 }
 
 int __ternary_mod(int a, int b)
 {
-    return a % b;
+    return (b == 0) ? 0 : (a % b);
 }
 
 int __ternary_neg(int a)

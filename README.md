@@ -90,6 +90,12 @@ To build the plugin, you need GCC with plugin support enabled.
 make
 ```
 
+On macOS, prefer Homebrew GCC and set the toolchain explicitly:
+
+```bash
+make CXX=g++-15 CC=gcc-15
+```
+
 Alternatively, with CMake (requires GMP and other deps):
 
 ```bash
@@ -110,6 +116,10 @@ Optional arguments:
 
 - `-fplugin-arg-ternary_plugin-warn` emits a warning for each ternary operator.
 - `-fplugin-arg-ternary_plugin-stats` prints a summary at the end of compilation.
+- `-fplugin-arg-ternary_plugin-version` prints the plugin version and GCC version.
+- `-fplugin-arg-ternary_plugin-selftest` prints a brief self-test summary of enabled features.
+- `-fplugin-arg-ternary_plugin-trace` logs lowering decisions for matching statements.
+- `-fplugin-arg-ternary_plugin-dump-gimple` dumps matching GIMPLE statements before rewriting.
 - `-fplugin-arg-ternary_plugin-lower` replaces ternary operators with calls to
   `__ternary_select_[i|u]<bits>` for integral result types (e.g., `__ternary_select_i32`)
   and `__ternary_select_f32` or `__ternary_select_f64` for floating-point types.
@@ -128,6 +138,14 @@ Optional arguments:
 - `-fplugin-arg-ternary_plugin-prefix=<name>` sets the function name prefix used by `-lower`
   (default: `__ternary_select`).
 
+Example with trace/dumps enabled:
+
+```bash
+gcc -fplugin=./ternary_plugin.so -fplugin-arg-ternary_plugin-lower \
+  -fplugin-arg-ternary_plugin-trace -fplugin-arg-ternary_plugin-dump-gimple \
+  -Iinclude -c source.c
+```
+
 ## Implementing the Helpers
 
 When using `-lower`, the plugin emits calls to external functions like `__ternary_select_i32`.
@@ -136,12 +154,15 @@ You need to provide implementations for these functions, tailored to your ternar
 Include `include/ternary_helpers.h` in your code, which provides example implementations using
 placeholder ternary ISA instructions (for example, `tsel`, `tadd`, `tmul`, `tnot`). Adjust the
 assembly to match your ISA. `TERNARY_COND_T` defines the condition type used by select helpers
-and must match the source condition type (defaults to `bool`).
+and is fixed to `ternary_cond_t` (default: `int64_t`). The plugin lowers conditions to
+`ternary_cond_t` before helper calls.
 
 For testing without the plugin, the header provides C implementations of all ternary operations.
 Packed ternary types use a 2-bit encoding per trit (00 = -1, 01 = 0, 10 = +1).
 Define `TERNARY_USE_BUILTIN_TYPES` before including the header when compiling with
 `-fplugin-arg-ternary_plugin-types` to avoid typedef conflicts.
+Helper/runtime support is currently provided for t6/t12/t24 only; t48/t96/t192 require
+custom runtime implementations.
 
 For example:
 
@@ -165,7 +186,7 @@ gcc -fplugin=./ternary_plugin.so -fplugin-arg-ternary_plugin-lower -Iinclude -c 
 For a minimal out-of-line runtime, use the reference implementation in `runtime/ternary_runtime.c`
 with the public header `include/ternary_runtime.h`. It implements the same packed 2-bit-trit
 semantics as the helpers (t6/t12/t24) and is intended as a starting point for a real ISA-backed
-library.
+library. Packed helpers for t48/t96/t192 are not provided in this reference runtime.
 
 Example build:
 
@@ -182,6 +203,12 @@ gcc -fplugin=./ternary_plugin.so -fplugin-arg-ternary_plugin-lower \
   -fplugin-arg-ternary_plugin-arith -fplugin-arg-ternary_plugin-logic \
   -fplugin-arg-ternary_plugin-cmp -fplugin-arg-ternary_plugin-shift \
   -fplugin-arg-ternary_plugin-conv -Iinclude -c test_ternary.c
+```
+
+On macOS, run:
+
+```bash
+make test CXX=g++-15 CC=gcc-15
 ```
 
 ## Description
