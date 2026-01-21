@@ -8,6 +8,7 @@ instructions.
 
 The plugin supports:
 - Packed ternary types: `t32_t`, `t64_t`, `t128_t` (32/64/128 trits; 2-bit packed encoding)
+- Vector ternary types: `tv32_t`, `tv64_t` (vectors of 2 × t32_t and 2 × t64_t for SIMD operations)
 - Extended arithmetic operations: add, sub, mul, div, mod, neg
 - Logic operations: not
 - Comparison operations: cmp (returns -1, 0, +1)
@@ -137,8 +138,10 @@ Optional arguments:
   `__builtin_ternary_shl`, `__builtin_ternary_shr`, `__builtin_ternary_rol`, and `__builtin_ternary_ror`.
 - `-fplugin-arg-ternary_plugin-conv` enables lowering of ternary conversion builtins like
   `__builtin_ternary_tb2t`, `__builtin_ternary_tt2b`, `__builtin_ternary_t2f`, and `__builtin_ternary_f2t`.
-- `-fplugin-arg-ternary_plugin-types` enables builtin ternary integer types `t32_t`, `t64_t`,
-  `t128_t` with packed 2-bit trit storage.
+- `-fplugin-arg-ternary_plugin-mem` enables lowering of ternary memory builtins like
+  `__builtin_ternary_load_t32`, `__builtin_ternary_store_t32`, `__builtin_ternary_load_t64`, and `__builtin_ternary_store_t64`.
+- `-fplugin-arg-ternary_plugin-vector` enables vectorized ternary operations for `tv32_t` and `tv64_t` types
+  (vectors of 2 × t32_t and 2 × t64_t respectively).
 - `-fplugin-arg-ternary_plugin-prefix=<name>` sets the base helper prefix used by lowering
   (default: `__ternary`). For example, select helpers become `<prefix>_select_i32` and arithmetic
   helpers become `<prefix>_add`, `<prefix>_sub`, etc.
@@ -255,16 +258,55 @@ make test CXX=g++-15 CC=gcc-15
 This plugin analyzes ternary conditional expressions in the code and can optionally
 lower ternary operations to helper calls suitable for targeting a balanced-ternary ISA.
 
-## Balanced Ternary Literals
+## ISA Operations
 
-Use balanced-ternary strings to construct packed values:
+The plugin provides groundwork for a balanced-ternary ISA with the following operations:
 
-```c
-t32_t a = T32_BT_STR("1 0 -1 1");
-t64_t b = T64_BT_STR("1,0,0,-1");
-```
+### Vector Operations - SIMD Acceleration ✓ IMPLEMENTED (tv32_t)
+- `tv32_t`: Vector type containing 2 × t32_t elements (128 bits total)
+- Arithmetic operations: `vadd`, `vsub`, `vmul` (element-wise on vector elements)
+- Logic operations: `vand`, `vor`, `vxor`, `vnot` (element-wise ternary logic)
+- Comparison operations: `vcmp` (element-wise ternary comparison)
 
-The parser consumes trits from left to right (most significant to least significant).
+Implemented as builtins:
+- `__builtin_ternary_add_tv32`, `__builtin_ternary_sub_tv32`, `__builtin_ternary_mul_tv32`, etc.
+- SIMD acceleration opportunities: Can leverage AVX/AVX-512 for parallel trit processing
+
+### SIMD Acceleration Opportunities - EXPLORATION
+
+The ternary vector operations provide a foundation for SIMD acceleration:
+
+**Current Implementation:**
+- Element-wise operations on packed ternary vectors
+- 128-bit vectors (tv32_t) for 2 × 32-trit operations
+- Foundation for wider SIMD utilization
+
+**Future SIMD Opportunities:**
+- **AVX-512 Integration**: 512-bit vectors for 8 × 32-trit or 4 × 64-trit operations
+- **Trit-Level Parallelism**: SIMD instructions for parallel trit manipulation
+- **Hardware Acceleration**: Custom ternary SIMD units for maximum performance
+- **Memory Bandwidth**: Efficient packed ternary data movement
+
+**Performance Characteristics:**
+- Balanced ternary enables simpler arithmetic than two's complement
+- Potential for higher computational density in AI/ML workloads
+- Reduced carry propagation compared to binary arithmetic
+
+### Control Flow Operations (brt/brf) - PLANNED
+- `brt Rc, label`: branch if Rc != 0 (ternary true)
+- `brf Rc, label`: branch if Rc == 0 (ternary false)
+
+These operate on ternary conditions and require RTL-level implementation for full support. The plugin currently lowers ternary conditions to helper calls but does not generate conditional jumps.
+
+### Calling Conventions - PLANNED
+
+Ternary-aware calling conventions are designed as follows:
+
+- **Argument Passing**: Ternary values passed in ternary registers when available, otherwise in binary containers
+- **Return Values**: Ternary results returned in ternary registers or binary containers as appropriate
+- **Register Allocation**: Ternary registers allocated for ternary-typed variables, with fallback to binary registers
+
+The current plugin provides the type system and operation lowering needed for these conventions but requires GCC backend modifications for full implementation.
 
 ## Known Limitations
 

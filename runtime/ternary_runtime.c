@@ -692,4 +692,181 @@ DEFINE_TERNARY_TYPE_OPS(64, t64_t, 64, unsigned __int128, ternary_decode_u128, t
                         ternary_tritwise_op_u128, ternary_shift_left_u128, ternary_shift_right_u128,
                         ternary_rotate_left_u128, ternary_rotate_right_u128)
 
+t32_t __ternary_load_t32(const void *addr)
+{
+    return *(const t32_t *)addr;
+}
+
+void __ternary_store_t32(void *addr, t32_t value)
+{
+    *(t32_t *)addr = value;
+}
+
+t64_t __ternary_load_t64(const void *addr)
+{
+    return *(const t64_t *)addr;
+}
+
+void __ternary_store_t64(void *addr, t64_t value)
+{
+    *(t64_t *)addr = value;
+}
+
+/* Vector operations - SIMD accelerated ternary computations */
+
+/* tv32_t operations (vector of 2 x t32_t) */
+tv32_t __ternary_add_tv32(tv32_t a, tv32_t b)
+{
+    // Extract two t32_t values from the 128-bit vector
+    t32_t a0 = (t32_t)(uint64_t)a;
+    t32_t a1 = (t32_t)(uint64_t)(a >> 64);
+    t32_t b0 = (t32_t)(uint64_t)b;
+    t32_t b1 = (t32_t)(uint64_t)(b >> 64);
+    
+    // Perform scalar operations
+    t32_t r0 = __ternary_add_t32(a0, b0);
+    t32_t r1 = __ternary_add_t32(a1, b1);
+    
+    // Pack back into 128-bit vector
+    return ((tv32_t)(uint64_t)r1 << 64) | (tv32_t)(uint64_t)r0;
+}
+
+tv32_t __ternary_sub_tv32(tv32_t a, tv32_t b)
+{
+    t32_t a0 = (t32_t)(uint64_t)a;
+    t32_t a1 = (t32_t)(uint64_t)(a >> 64);
+    t32_t b0 = (t32_t)(uint64_t)b;
+    t32_t b1 = (t32_t)(uint64_t)(b >> 64);
+    
+    t32_t r0 = __ternary_sub_t32(a0, b0);
+    t32_t r1 = __ternary_sub_t32(a1, b1);
+    
+    return ((tv32_t)(uint64_t)r1 << 64) | (tv32_t)(uint64_t)r0;
+}
+
+tv32_t __ternary_mul_tv32(tv32_t a, tv32_t b)
+{
+    t32_t a0 = (t32_t)(uint64_t)a;
+    t32_t a1 = (t32_t)(uint64_t)(a >> 64);
+    t32_t b0 = (t32_t)(uint64_t)b;
+    t32_t b1 = (t32_t)(uint64_t)(b >> 64);
+    
+    t32_t r0 = __ternary_mul_t32(a0, b0);
+    t32_t r1 = __ternary_mul_t32(a1, b1);
+    
+    return ((tv32_t)(uint64_t)r1 << 64) | (tv32_t)(uint64_t)r0;
+}
+
+tv32_t __ternary_and_tv32(tv32_t a, tv32_t b)
+{
+    t32_t a0 = (t32_t)(uint64_t)a;
+    t32_t a1 = (t32_t)(uint64_t)(a >> 64);
+    t32_t b0 = (t32_t)(uint64_t)b;
+    t32_t b1 = (t32_t)(uint64_t)(b >> 64);
+    
+    t32_t r0 = __ternary_and_t32(a0, b0);
+    t32_t r1 = __ternary_and_t32(a1, b1);
+    
+    return ((tv32_t)(uint64_t)r1 << 64) | (tv32_t)(uint64_t)r0;
+}
+
+tv32_t __ternary_or_tv32(tv32_t a, tv32_t b)
+{
+    t32_t a0 = (t32_t)(uint64_t)a;
+    t32_t a1 = (t32_t)(uint64_t)(a >> 64);
+    t32_t b0 = (t32_t)(uint64_t)b;
+    t32_t b1 = (t32_t)(uint64_t)(b >> 64);
+    
+    t32_t r0 = __ternary_or_t32(a0, b0);
+    t32_t r1 = __ternary_or_t32(a1, b1);
+    
+    return ((tv32_t)(uint64_t)r1 << 64) | (tv32_t)(uint64_t)r0;
+}
+
+tv32_t __ternary_xor_tv32(tv32_t a, tv32_t b)
+{
+    t32_t a0 = (t32_t)(uint64_t)a;
+    t32_t a1 = (t32_t)(uint64_t)(a >> 64);
+    t32_t b0 = (t32_t)(uint64_t)b;
+    t32_t b1 = (t32_t)(uint64_t)(b >> 64);
+    
+    t32_t r0 = __ternary_xor_t32(a0, b0);
+    t32_t r1 = __ternary_xor_t32(a1, b1);
+    
+    return ((tv32_t)(uint64_t)r1 << 64) | (tv32_t)(uint64_t)r0;
+}
+
+tv32_t __ternary_not_tv32(tv32_t a)
+{
+    t32_t a0 = (t32_t)(uint64_t)a;
+    t32_t a1 = (t32_t)(uint64_t)(a >> 64);
+    
+    t32_t r0 = __ternary_not_t32(a0);
+    t32_t r1 = __ternary_not_t32(a1);
+    
+    return ((tv32_t)(uint64_t)r1 << 64) | (tv32_t)(uint64_t)r0;
+}
+
+tv32_t __ternary_cmp_tv32(tv32_t a, tv32_t b)
+{
+    t32_t a0 = (t32_t)(uint64_t)a;
+    t32_t a1 = (t32_t)(uint64_t)(a >> 64);
+    t32_t b0 = (t32_t)(uint64_t)b;
+    t32_t b1 = (t32_t)(uint64_t)(b >> 64);
+    
+    t32_t r0 = __ternary_cmplt_t32(a0, b0);
+    t32_t r1 = __ternary_cmplt_t32(a1, b1);
+    
+    return ((tv32_t)(uint64_t)r1 << 64) | (tv32_t)(uint64_t)r0;
+}
+
+/* tv64_t operations (vector of 2 x t64_t) - TODO: Implement for struct type */
+tv64_t __ternary_add_tv64(tv64_t a, tv64_t b)
+{
+    // TODO: Implement for struct type
+    return a; // Placeholder
+}
+
+tv64_t __ternary_sub_tv64(tv64_t a, tv64_t b)
+{
+    // TODO: Implement for struct type
+    return a; // Placeholder
+}
+
+tv64_t __ternary_mul_tv64(tv64_t a, tv64_t b)
+{
+    // TODO: Implement for struct type
+    return a; // Placeholder
+}
+
+tv64_t __ternary_and_tv64(tv64_t a, tv64_t b)
+{
+    // TODO: Implement for struct type
+    return a; // Placeholder
+}
+
+tv64_t __ternary_or_tv64(tv64_t a, tv64_t b)
+{
+    // TODO: Implement for struct type
+    return a; // Placeholder
+}
+
+tv64_t __ternary_xor_tv64(tv64_t a, tv64_t b)
+{
+    // TODO: Implement for struct type
+    return a; // Placeholder
+}
+
+tv64_t __ternary_not_tv64(tv64_t a)
+{
+    // TODO: Implement for struct type
+    return a; // Placeholder
+}
+
+tv64_t __ternary_cmp_tv64(tv64_t a, tv64_t b)
+{
+    // TODO: Implement for struct type
+    return a; // Placeholder
+}
+
 #undef DEFINE_TERNARY_TYPE_OPS

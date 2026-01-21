@@ -16,11 +16,10 @@ typedef uint64_t t32_t;           /* 32 trits -> 64 bits */
 typedef unsigned __int128 t64_t;  /* 64 trits -> 128 bits */
 #endif
 
-// Vector types
-typedef uint64_t v2t32_t;   // 2 x t32
-typedef uint64_t v4t32_t;   // 4 x t32
-typedef unsigned __int128 v2t64_t;  // 2 x t64
-typedef unsigned __int128 v4t64_t;  // 4 x t64
+// Vector types - packed ternary vectors for SIMD operations
+#ifndef TERNARY_USE_BUILTIN_TYPES
+typedef unsigned __int128 tv32_t; /* vector of 2 x t32_t (128 bits) */
+#endif
 
 // Builtin function declarations (for plugin lowering)
 extern int __builtin_ternary_add(int a, int b);
@@ -53,9 +52,30 @@ extern t64_t __builtin_ternary_cmpeq_t64(t64_t a, t64_t b);
 extern t64_t __builtin_ternary_cmpgt_t64(t64_t a, t64_t b);
 extern t64_t __builtin_ternary_cmpneq_t64(t64_t a, t64_t b);
 
-// Vector builtins
-extern v2t32_t __builtin_ternary_add_v2t32(v2t32_t a, v2t32_t b);
-extern v4t64_t __builtin_ternary_mul_v4t64(v4t64_t a, v4t64_t b);
+// Memory operations (tld/tst)
+extern t32_t __builtin_ternary_load_t32(const void *addr);
+extern void __builtin_ternary_store_t32(void *addr, t32_t value);
+extern t64_t __builtin_ternary_load_t64(const void *addr);
+extern void __builtin_ternary_store_t64(void *addr, t64_t value);
+
+// Vector operations - SIMD accelerated ternary computations
+extern tv32_t __builtin_ternary_add_tv32(tv32_t a, tv32_t b);
+extern tv32_t __builtin_ternary_sub_tv32(tv32_t a, tv32_t b);
+extern tv32_t __builtin_ternary_mul_tv32(tv32_t a, tv32_t b);
+extern tv32_t __builtin_ternary_and_tv32(tv32_t a, tv32_t b);
+extern tv32_t __builtin_ternary_or_tv32(tv32_t a, tv32_t b);
+extern tv32_t __builtin_ternary_xor_tv32(tv32_t a, tv32_t b);
+extern tv32_t __builtin_ternary_not_tv32(tv32_t a);
+extern tv32_t __builtin_ternary_cmp_tv32(tv32_t a, tv32_t b);
+
+extern tv64_t __builtin_ternary_add_tv64(tv64_t a, tv64_t b);
+extern tv64_t __builtin_ternary_sub_tv64(tv64_t a, tv64_t b);
+extern tv64_t __builtin_ternary_mul_tv64(tv64_t a, tv64_t b);
+extern tv64_t __builtin_ternary_and_tv64(tv64_t a, tv64_t b);
+extern tv64_t __builtin_ternary_or_tv64(tv64_t a, tv64_t b);
+extern tv64_t __builtin_ternary_xor_tv64(tv64_t a, tv64_t b);
+extern tv64_t __builtin_ternary_not_tv64(tv64_t a);
+extern tv64_t __builtin_ternary_cmp_tv64(tv64_t a, tv64_t b);
 
 // Balanced-ternary string literals (e.g. "1 0 -1 1")
 #define T32_BT_STR(s) __ternary_bt_str_t32(s)

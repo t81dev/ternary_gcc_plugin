@@ -16,6 +16,9 @@ typedef int64_t ternary_cond_t;
 #ifndef TERNARY_USE_BUILTIN_TYPES
 typedef uint64_t t32_t;           /* 32 trits -> 64 bits */
 typedef unsigned __int128 t64_t;  /* 64 trits -> 128 bits */
+typedef unsigned __int128 tv32_t; /* vector of 2 x t32_t (128 bits) */
+typedef struct { unsigned __int128 lo, hi; } tv64_t; /* vector of 2 x t64_t (256 bits) */
+typedef struct { unsigned __int128 lo, hi; } tv128_t; /* vector of 2 x t128_t (512 bits) */
 #endif
 
 /* Varargs helpers for ternary packed types. */
@@ -116,6 +119,31 @@ t64_t __ternary_cmplt_t64(t64_t a, t64_t b);
 t64_t __ternary_cmpeq_t64(t64_t a, t64_t b);
 t64_t __ternary_cmpgt_t64(t64_t a, t64_t b);
 t64_t __ternary_cmpneq_t64(t64_t a, t64_t b);
+
+/* Memory operations (tld/tst) */
+t32_t __ternary_load_t32(const void *addr);
+void __ternary_store_t32(void *addr, t32_t value);
+t64_t __ternary_load_t64(const void *addr);
+void __ternary_store_t64(void *addr, t64_t value);
+
+/* Vector operations - SIMD accelerated ternary computations */
+tv32_t __ternary_add_tv32(tv32_t a, tv32_t b);
+tv32_t __ternary_sub_tv32(tv32_t a, tv32_t b);
+tv32_t __ternary_mul_tv32(tv32_t a, tv32_t b);
+tv32_t __ternary_and_tv32(tv32_t a, tv32_t b);
+tv32_t __ternary_or_tv32(tv32_t a, tv32_t b);
+tv32_t __ternary_xor_tv32(tv32_t a, tv32_t b);
+tv32_t __ternary_not_tv32(tv32_t a);
+tv32_t __ternary_cmp_tv32(tv32_t a, tv32_t b);
+
+tv64_t __ternary_add_tv64(tv64_t a, tv64_t b);
+tv64_t __ternary_sub_tv64(tv64_t a, tv64_t b);
+tv64_t __ternary_mul_tv64(tv64_t a, tv64_t b);
+tv64_t __ternary_and_tv64(tv64_t a, tv64_t b);
+tv64_t __ternary_or_tv64(tv64_t a, tv64_t b);
+tv64_t __ternary_xor_tv64(tv64_t a, tv64_t b);
+tv64_t __ternary_not_tv64(tv64_t a);
+tv64_t __ternary_cmp_tv64(tv64_t a, tv64_t b);
 
 #ifdef __cplusplus
 }
