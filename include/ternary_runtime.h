@@ -82,6 +82,12 @@ t32_t __ternary_f2t64_t32(double v);
 int __ternary_cmp_t32(t32_t a, t32_t b);
 t32_t __ternary_bt_str_t32(const char *s);
 
+/* Ternary-specific comparison operations (return ternary results) */
+t32_t __ternary_cmplt_t32(t32_t a, t32_t b);
+t32_t __ternary_cmpeq_t32(t32_t a, t32_t b);
+t32_t __ternary_cmpgt_t32(t32_t a, t32_t b);
+t32_t __ternary_cmpneq_t32(t32_t a, t32_t b);
+
 t64_t __ternary_add_t64(t64_t a, t64_t b);
 t64_t __ternary_mul_t64(t64_t a, t64_t b);
 t64_t __ternary_not_t64(t64_t a);
@@ -104,6 +110,12 @@ t64_t __ternary_f2t32_t64(float v);
 t64_t __ternary_f2t64_t64(double v);
 int __ternary_cmp_t64(t64_t a, t64_t b);
 t64_t __ternary_bt_str_t64(const char *s);
+
+/* Ternary-specific comparison operations for t64 (return ternary results) */
+t64_t __ternary_cmplt_t64(t64_t a, t64_t b);
+t64_t __ternary_cmpeq_t64(t64_t a, t64_t b);
+t64_t __ternary_cmpgt_t64(t64_t a, t64_t b);
+t64_t __ternary_cmpneq_t64(t64_t a, t64_t b);
 
 #ifdef __cplusplus
 }

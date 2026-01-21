@@ -43,6 +43,16 @@ extern int __builtin_ternary_tt2b(t32_t v);
 extern float __builtin_ternary_t2f(t32_t v);
 extern t32_t __builtin_ternary_f2t(float v);
 
+// Ternary-specific comparison builtins (return ternary results)
+extern t32_t __builtin_ternary_cmplt(t32_t a, t32_t b);
+extern t32_t __builtin_ternary_cmpeq(t32_t a, t32_t b);
+extern t32_t __builtin_ternary_cmpgt(t32_t a, t32_t b);
+extern t32_t __builtin_ternary_cmpneq(t32_t a, t32_t b);
+extern t64_t __builtin_ternary_cmplt_t64(t64_t a, t64_t b);
+extern t64_t __builtin_ternary_cmpeq_t64(t64_t a, t64_t b);
+extern t64_t __builtin_ternary_cmpgt_t64(t64_t a, t64_t b);
+extern t64_t __builtin_ternary_cmpneq_t64(t64_t a, t64_t b);
+
 // Vector builtins
 extern v2t32_t __builtin_ternary_add_v2t32(v2t32_t a, v2t32_t b);
 extern v4t64_t __builtin_ternary_mul_v4t64(v4t64_t a, v4t64_t b);

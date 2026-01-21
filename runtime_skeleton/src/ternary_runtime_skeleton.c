@@ -195,9 +195,11 @@ static int ternary_trit_max(int a, int b)
 
 static int ternary_trit_xor(int a, int b)
 {
-    int mn = ternary_trit_min(a, b);
-    int mx = ternary_trit_max(a, b);
-    return a + b - 2 * mn - 2 * mx;
+    int sum = a + b;
+    int mod = ((sum % 3) + 3) % 3;
+    if (mod == 0) return 0;
+    if (mod == 1) return 1;
+    return -1;
 }
 
 static uint64_t ternary_tritwise_op_u64(uint64_t a, uint64_t b, unsigned trit_count, int op)

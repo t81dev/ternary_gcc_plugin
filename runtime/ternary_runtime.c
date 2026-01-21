@@ -113,9 +113,11 @@ static int ternary_trit_max(int a, int b)
 
 static int ternary_trit_xor(int a, int b)
 {
-    int mn = ternary_trit_min(a, b);
-    int mx = ternary_trit_max(a, b);
-    return a + b - 2 * mn - 2 * mx;
+    int sum = a + b;
+    int mod = ((sum % 3) + 3) % 3;
+    if (mod == 0) return 0;
+    if (mod == 1) return 1;
+    return -1;
 }
 
 static int ternary_get_trit(uint64_t packed, unsigned idx)
@@ -660,6 +662,27 @@ int __ternary_ge(int a, int b)
     { \
         int cmp = __ternary_cmp_t##SUFFIX(a, b); \
         return cmp == 1 || cmp == 0 ? 1 : 0; \
+    } \
+    /* Ternary-specific comparison operations returning ternary results */ \
+    TYPE __ternary_cmplt_t##SUFFIX(TYPE a, TYPE b) \
+    { \
+        int cmp = __ternary_cmp_t##SUFFIX(a, b); \
+        return (TYPE)ENCODE(cmp == -1 ? -1 : 0, TRITS); \
+    } \
+    TYPE __ternary_cmpeq_t##SUFFIX(TYPE a, TYPE b) \
+    { \
+        int cmp = __ternary_cmp_t##SUFFIX(a, b); \
+        return (TYPE)ENCODE(cmp == 0 ? 1 : 0, TRITS); \
+    } \
+    TYPE __ternary_cmpgt_t##SUFFIX(TYPE a, TYPE b) \
+    { \
+        int cmp = __ternary_cmp_t##SUFFIX(a, b); \
+        return (TYPE)ENCODE(cmp == 1 ? 1 : 0, TRITS); \
+    } \
+    TYPE __ternary_cmpneq_t##SUFFIX(TYPE a, TYPE b) \
+    { \
+        int cmp = __ternary_cmp_t##SUFFIX(a, b); \
+        return (TYPE)ENCODE(cmp != 0 ? 1 : 0, TRITS); \
     }
 
 DEFINE_TERNARY_TYPE_OPS(32, t32_t, 32, uint64_t, ternary_decode, ternary_encode,

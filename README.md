@@ -139,8 +139,9 @@ Optional arguments:
   `__builtin_ternary_tb2t`, `__builtin_ternary_tt2b`, `__builtin_ternary_t2f`, and `__builtin_ternary_f2t`.
 - `-fplugin-arg-ternary_plugin-types` enables builtin ternary integer types `t32_t`, `t64_t`,
   `t128_t` with packed 2-bit trit storage.
-- `-fplugin-arg-ternary_plugin-prefix=<name>` sets the function name prefix used by `-lower`
-  (default: `__ternary_select`).
+- `-fplugin-arg-ternary_plugin-prefix=<name>` sets the base helper prefix used by lowering
+  (default: `__ternary`). For example, select helpers become `<prefix>_select_i32` and arithmetic
+  helpers become `<prefix>_add`, `<prefix>_sub`, etc.
 
 Example with trace/dumps enabled:
 
