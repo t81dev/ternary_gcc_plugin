@@ -6,17 +6,21 @@
 
 int main() {
     // Test type promotion
-    t6_t t6 = 1;
-    t12_t t12 = 2;
-    t24_t t24 = 3;
+    t32_t t32 = 1;
+    t64_t t64 = 2;
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+    t128_t t128 = 3;
+#endif
 
     // Implicit conversions
-    t12 = t6;  // Should promote
-    t24 = t12; // Should promote
+    t64 = t32;  // Should promote
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+    t128 = t64; // Should promote
+#endif
 
     // Arithmetic - assuming builtins are enabled, but for compile test, just assign
-    t6_t result1 = t6; // Placeholder
-    t12_t result2 = t12; // Placeholder
+    t32_t result1 = t32; // Placeholder
+    t64_t result2 = t64; // Placeholder
 
     printf("Type promotion test passed\n");
     return 0;

@@ -11,10 +11,10 @@ extern int __builtin_ternary_shl(int a, int shift);
 extern int __builtin_ternary_shr(int a, int shift);
 extern int __builtin_ternary_rol(int a, int shift);
 extern int __builtin_ternary_ror(int a, int shift);
-extern t6_t __builtin_ternary_tb2t(int a);
-extern int __builtin_ternary_tt2b(t6_t v);
-extern float __builtin_ternary_t2f(t6_t v);
-extern t6_t __builtin_ternary_f2t(float v);
+extern t32_t __builtin_ternary_tb2t(int a);
+extern int __builtin_ternary_tt2b(t32_t v);
+extern float __builtin_ternary_t2f(t32_t v);
+extern t32_t __builtin_ternary_f2t(float v);
 
 int test_integral(int cond, int a, int b) {
     // This will be lowered to __ternary_select_i32(cond, a, b)
@@ -101,19 +101,19 @@ int test_ternary_ror(int a, int shift) {
     return __builtin_ternary_ror(a, shift);
 }
 
-t6_t test_ternary_tb2t(int a) {
+t32_t test_ternary_tb2t(int a) {
     return __builtin_ternary_tb2t(a);
 }
 
-int test_ternary_tt2b(t6_t v) {
+int test_ternary_tt2b(t32_t v) {
     return __builtin_ternary_tt2b(v);
 }
 
-float test_ternary_t2f(t6_t v) {
+float test_ternary_t2f(t32_t v) {
     return __builtin_ternary_t2f(v);
 }
 
-t6_t test_ternary_f2t(float v) {
+t32_t test_ternary_f2t(float v) {
     return __builtin_ternary_f2t(v);
 }
 
@@ -138,10 +138,10 @@ int main() {
     int result18 = test_ternary_shr(9, 1);
     int result19 = test_ternary_rol(3, 2);
     int result20 = test_ternary_ror(3, 2);
-    t6_t tval = test_ternary_tb2t(5);
+    t32_t tval = test_ternary_tb2t(5);
     int result21 = test_ternary_tt2b(tval);
     float result22 = test_ternary_t2f(tval);
-    t6_t tfromf = test_ternary_f2t(3.2f);
+    t32_t tfromf = test_ternary_f2t(3.2f);
     int result23 = test_ternary_tt2b(tfromf);
 
     return result1 + result2 + (int)result3 + (int)result4 + result5 + result6 + result7 + result8 +

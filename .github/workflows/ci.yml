@@ -22,7 +22,7 @@ jobs:
             gcc-version: 15
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Install GCC ${{ matrix.gcc-version }}
       if: matrix.os == 'ubuntu-latest'
@@ -39,6 +39,20 @@ jobs:
         echo "CC=gcc-${{ matrix.gcc-version }}" >> $GITHUB_ENV
         echo "CXX=g++-${{ matrix.gcc-version }}" >> $GITHUB_ENV
 
+    - name: Build runtime
+      run: make runtime
+
+    - name: Build plugin
+      run: make plugin
+
     - name: Run Tests
+      run: make test
+
+    - name: Install
+      run: sudo make install
+
+    - name: Test installation
       run: |
-        make test
+        echo '#include <ternary.h>' > test_install.c
+        echo 'int main() { return 0; }' >> test_install.c
+        $CC -I/usr/local/include/ternary -c test_install.c -o test_install.o

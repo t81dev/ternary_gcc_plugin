@@ -10,9 +10,9 @@ int main(int argc, char *argv[]) {
 
     int a = atoi(argv[2]);
     int b = atoi(argv[3]);
-    t12_t ta = int_to_ternary(a);
-    t12_t tb = int_to_ternary(b);
-    t12_t result;
+    t32_t ta = int_to_ternary(a);
+    t32_t tb = int_to_ternary(b);
+    t32_t result;
 
     if (strcmp(argv[1], "add") == 0) {
         result = ta + tb;

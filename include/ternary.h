@@ -12,16 +12,15 @@
 
 // Ternary types (from runtime)
 #ifndef TERNARY_USE_BUILTIN_TYPES
-typedef uint16_t t6_t;   /* 6 trits -> 12 bits */
-typedef uint32_t t12_t;  /* 12 trits -> 24 bits */
-typedef uint64_t t24_t;  /* 24 trits -> 48 bits */
+typedef uint64_t t32_t;           /* 32 trits -> 64 bits */
+typedef unsigned __int128 t64_t;  /* 64 trits -> 128 bits */
 #endif
 
 // Vector types
-typedef uint64_t v2t6_t;   // 2 x t6
-typedef uint64_t v4t6_t;   // 4 x t6
-typedef uint64_t v2t12_t;  // 2 x t12
-typedef uint64_t v4t12_t;  // 4 x t12
+typedef uint64_t v2t32_t;   // 2 x t32
+typedef uint64_t v4t32_t;   // 4 x t32
+typedef unsigned __int128 v2t64_t;  // 2 x t64
+typedef unsigned __int128 v4t64_t;  // 4 x t64
 
 // Builtin function declarations (for plugin lowering)
 extern int __builtin_ternary_add(int a, int b);
@@ -39,34 +38,36 @@ extern int __builtin_ternary_shl(int a, int shift);
 extern int __builtin_ternary_shr(int a, int shift);
 extern int __builtin_ternary_rol(int a, int shift);
 extern int __builtin_ternary_ror(int a, int shift);
-extern t6_t __builtin_ternary_tb2t(int a);
-extern int __builtin_ternary_tt2b(t6_t v);
-extern float __builtin_ternary_t2f(t6_t v);
-extern t6_t __builtin_ternary_f2t(float v);
+extern t32_t __builtin_ternary_tb2t(int a);
+extern int __builtin_ternary_tt2b(t32_t v);
+extern float __builtin_ternary_t2f(t32_t v);
+extern t32_t __builtin_ternary_f2t(float v);
 
 // Vector builtins
-extern v2t6_t __builtin_ternary_add_v2t6(v2t6_t a, v2t6_t b);
-extern v4t12_t __builtin_ternary_mul_v4t12(v4t12_t a, v4t12_t b);
+extern v2t32_t __builtin_ternary_add_v2t32(v2t32_t a, v2t32_t b);
+extern v4t64_t __builtin_ternary_mul_v4t64(v4t64_t a, v4t64_t b);
 
-// Convenience macros for literals (placeholders)
-#define TERNARY_LITERAL(x) ((t12_t)(x))
+// Balanced-ternary string literals (e.g. "1 0 -1 1")
+#define T32_BT_STR(s) __ternary_bt_str_t32(s)
+#define T64_BT_STR(s) __ternary_bt_str_t64(s)
+#define TERNARY_LITERAL(s) __ternary_bt_str_t32(s)
 
 // Conversion macros
 #define ternary_to_int(t) ((int)(t))
-#define int_to_ternary(i) ((t12_t)(i))
+#define int_to_ternary(i) ((t32_t)(i))
 #define ternary_to_float(t) ((float)(t))
-#define float_to_ternary(f) ((t12_t)(f))
+#define float_to_ternary(f) ((t32_t)(f))
 
 // Helper macros for operations
 #define ternary_select(cond, t, f) ((cond) ? (t) : (f))
 #define ternary_abs(x) ((x) < 0 ? -(x) : (x))
 
 // Inline helper functions
-static inline int ternary_is_zero(t12_t x) {
+static inline int ternary_is_zero(t32_t x) {
     return x == 0;
 }
 
-static inline int ternary_sign(t12_t x) {
+static inline int ternary_sign(t32_t x) {
     return (x > 0) ? 1 : ((x < 0) ? -1 : 0);
 }
 

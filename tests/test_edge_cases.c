@@ -29,36 +29,31 @@ int main() {
     printf("Select false: %d\n", select_result);
 
     // Shift/rotate semantics on packed ternary types.
-    // Note: t48/t96/t192 helpers are not implemented in the reference runtime.
-    t6_t tval = __ternary_tb2t_t6(2);
-    t6_t tval_shl = __ternary_shl_t6(tval, 1);
-    t6_t tval_shr = __ternary_shr_t6(tval_shl, 1);
-    printf("t6 shl/shr: %lld\n", (long long)__ternary_tt2b_t6(tval_shr));
+    // Note: t128 helpers are not implemented in the reference runtime.
+    t32_t tval = __ternary_tb2t_t32(2);
+    t32_t tval_shl = __ternary_shl_t32(tval, 1);
+    t32_t tval_shr = __ternary_shr_t32(tval_shl, 1);
+    printf("t32 shl/shr: %lld\n", (long long)__ternary_tt2b_t32(tval_shr));
 
-    t6_t tval_top = __ternary_tb2t_t6(243); // 3^5
-    t6_t tval_rol = __ternary_rol_t6(tval_top, 1);
-    t6_t tval_ror = __ternary_ror_t6(tval_rol, 1);
-    printf("t6 rol/ror: %lld\n", (long long)__ternary_tt2b_t6(tval_ror));
+    t32_t tval_top = __ternary_tb2t_t32(243); // 3^5
+    t32_t tval_rol = __ternary_rol_t32(tval_top, 1);
+    t32_t tval_ror = __ternary_ror_t32(tval_rol, 1);
+    printf("t32 rol/ror: %lld\n", (long long)__ternary_tt2b_t32(tval_ror));
 
-    t6_t tval_mask = __ternary_shl_t6(tval, 6);
-    printf("t6 shl mask: %lld\n", (long long)__ternary_tt2b_t6(tval_mask));
+    t32_t tval_mask = __ternary_shl_t32(tval, 32);
+    printf("t32 shl mask: %lld\n", (long long)__ternary_tt2b_t32(tval_mask));
 
-    t12_t t12_a = __ternary_tb2t_t12(7);
-    t12_t t12_div0 = __ternary_div_t12(t12_a, __ternary_tb2t_t12(0));
-    printf("t12 div0: %lld\n", (long long)__ternary_tt2b_t12(t12_div0));
-    printf("t12 shl mask: %lld\n", (long long)__ternary_tt2b_t12(__ternary_shl_t12(t12_a, 12)));
+    t64_t t64_a = __ternary_tb2t_t64(7);
+    t64_t t64_div0 = __ternary_div_t64(t64_a, __ternary_tb2t_t64(0));
+    printf("t64 div0: %lld\n", (long long)__ternary_tt2b_t64(t64_div0));
+    printf("t64 shl mask: %lld\n", (long long)__ternary_tt2b_t64(__ternary_shl_t64(t64_a, 64)));
 
-    t24_t t24_a = __ternary_tb2t_t24(-9);
-    t24_t t24_mod0 = __ternary_mod_t24(t24_a, __ternary_tb2t_t24(0));
-    printf("t24 mod0: %lld\n", (long long)__ternary_tt2b_t24(t24_mod0));
-    printf("t24 shr mask: %lld\n", (long long)__ternary_tt2b_t24(__ternary_shr_t24(t24_a, 24)));
-
-    printf("t6 cmp -1 vs +1: %d\n",
-           __ternary_cmp_t6(__ternary_tb2t_t6(-1), __ternary_tb2t_t6(1)));
+    printf("t32 cmp -1 vs +1: %d\n",
+           __ternary_cmp_t32(__ternary_tb2t_t32(-1), __ternary_tb2t_t32(1)));
 
     // Conversion rounding toward zero.
-    t6_t t_from_f = __ternary_f2t32_t6(-2.9f);
-    printf("f2t trunc: %lld\n", (long long)__ternary_tt2b_t6(t_from_f));
+    t32_t t_from_f = __ternary_f2t32_t32(-2.9f);
+    printf("f2t trunc: %lld\n", (long long)__ternary_tt2b_t32(t_from_f));
 
     return 0;
 }

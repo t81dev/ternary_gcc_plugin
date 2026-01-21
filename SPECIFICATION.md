@@ -51,18 +51,31 @@ reinterpretation of the same trit pattern with a different comparison rule.
 
 The ISA defines ternary integer types by trit width:
 
-- t6, t12, t24, t48, t96, t192 (suggested), with platform-specific availability.
+- t32, t64, t128 (initial focus), with platform-specific availability.
 
 The toolchain maps these to C integer types via a storage ABI that packs trits into
 binary containers. A recommended mapping using 2-bit trit packing is:
 
-- t6  -> stored in 16-bit container (12 bits used)
-- t12 -> stored in 32-bit container (24 bits used)
-- t24 -> stored in 64-bit container (48 bits used)
-- t48 -> stored in 128-bit container (96 bits used)
+- t32  -> stored in 64-bit container
+- t64  -> stored in 128-bit container
+- t128 -> stored in 256-bit container
 
 Packing is logical; the physical encoding is an ABI detail. Compilers must preserve
 bit patterns across loads/stores and calls.
+
+### Source Literal Helpers
+
+The current toolchain does not define a native ternary literal token. Instead, it
+provides helpers that parse balanced-ternary strings left-to-right (most significant
+trit first). Example:
+
+```c
+t32_t a = T32_BT_STR("1 0 -1 1");
+t64_t b = T64_BT_STR("1,0,0,-1");
+```
+
+The runtime parser accepts `-1`, `0`, `1`, or `+1` tokens separated by whitespace or
+commas. Invalid strings return zero.
 
 ### Boolean and Condition Types
 
@@ -77,6 +90,15 @@ decoded with tt2b first.
 IEEE-754 binary float and double are preserved. Ternary select supports floats, but
 ternary arithmetic is limited to integer types for now.
 
+### Type Promotion and Conversion Rules
+
+Ternary types follow C-like promotion rules for operations:
+
+- Usual arithmetic conversions: smaller types promote to larger (t32 -> t64 -> t128).
+- Mixed ternary/binary: ternary promotes to binary container size for compatibility.
+- Condition handling: ternary conditions are ternary_cond_t (int8_t with trit values).
+- Conversions: explicit casts use helper functions; implicit conversions require plugin lowering.
+
 ## Instruction Semantics
 
 ### Arithmetic
@@ -90,10 +112,9 @@ Ternary logic is defined with min/max semantics:
 
 - tand(a,b) = min(a,b)
 - tor(a,b)  = max(a,b)
-- txor(a,b) = a + b - 2 * min(a,b) - 2 * max(a,b) (ISA may choose alternative ternary XOR)
+- txor(a,b) = 0 if a == b, else -a if b == 0, else -b if a == 0, else 0
 
-Implementations may choose a different ternary XOR definition, but it must be
-documented and stable.
+This definition is stable and documented.
 
 ### Comparisons
 
@@ -176,8 +197,8 @@ but operand formats and semantics are fully specified. The ISA operates on packe
 - Fn: IEEE floating-point register (f32/f64).
 - Imm: immediate value (binary-encoded).
 
-Ternary registers have a fixed trit width per instruction variant (e.g., t6, t12,
-t24, t48, t96, t192). The width is encoded in the mnemonic suffix.
+Ternary registers have a fixed trit width per instruction variant (e.g., t32, t64,
+t128). The width is encoded in the mnemonic suffix.
 
 ### Register and Instruction Formats
 
@@ -190,6 +211,18 @@ The base ISA assumes a three-operand format for ternary ALU operations:
 
 Where:
 - Td/Ta/Tb/Tc are ternary registers of width tN.
+
+## Roadmap / Next Steps
+
+Priority | Suggestion | Why it helps | Status
+--- | --- | --- | ---
+High | Finish/clean lowering for common ops (add/sub/mul/neg/cmp/select/conv) | Lets users write straightforward ternary arithmetic without manual loops | In progress
+High | Small portable runtime lib for t32/t64 | Enables real programs and benchmarking | Implemented (reference runtime in `runtime/`)
+Medium | Trit-count-aware constant folding in plugin | Allows constants like `t32_t x = 42` to fold when representable | In progress
+Medium | Better ternary type creation and user-facing syntax (e.g., `__ternary(32)` or attributes) | Easier adoption | Planned
+Medium | Dump stats on how many ternary ops survive to RTL/assembly | Quantifies remaining work for hardware targets | Planned
+Low | Larger trit counts (t256+) via limb-based runtime emulation | Future-proofs larger types | Planned
+Low | Branch-free ternary↔binary conversion helpers | Improves emulation speed | Planned
 - Rd is a binary integer register holding {-1,0,+1} in two's complement.
 
 ### Instruction Semantics
@@ -311,6 +344,12 @@ macros to decode promotions for packed ternary types.
 - __builtin_ternary_or(a, b)
 - __builtin_ternary_xor(a, b)
 - __builtin_ternary_cmp(a, b)
+- __builtin_ternary_eq(a, b) -> int
+- __builtin_ternary_ne(a, b) -> int
+- __builtin_ternary_lt(a, b) -> int
+- __builtin_ternary_le(a, b) -> int
+- __builtin_ternary_gt(a, b) -> int
+- __builtin_ternary_ge(a, b) -> int
 - __builtin_ternary_shl(a, b)
 - __builtin_ternary_shr(a, b)
 - __builtin_ternary_rol(a, b)
@@ -323,7 +362,7 @@ macros to decode promotions for packed ternary types.
 ### Custom Types
 
 When `-fplugin-arg-ternary_plugin-types` is enabled, the plugin registers builtin
-types `t6_t`, `t12_t`, `t24_t`, `t48_t`, `t96_t`, and `t192_t` with packed 2-bit
+types `t32_t`, `t64_t`, and `t128_t` with packed 2-bit
 trit storage (precision = trit_count * 2).
 
 ### Helper ABI
@@ -344,6 +383,12 @@ Helper functions implement ISA-visible operations in C:
 - __ternary_or(a, b)
 - __ternary_xor(a, b)
 - __ternary_cmp(a, b)
+- __ternary_eq(a, b) -> int
+- __ternary_ne(a, b) -> int
+- __ternary_lt(a, b) -> int
+- __ternary_le(a, b) -> int
+- __ternary_gt(a, b) -> int
+- __ternary_ge(a, b) -> int
 - __ternary_shl(a, b)
 - __ternary_shr(a, b)
 - __ternary_rol(a, b)
@@ -366,7 +411,7 @@ ternary_cond_t before calling helpers. The reference helper header uses a packed
 
 ## Testing and Validation
 
-- Ternary select: int, unsigned, float, double, and custom ternary types (t6_t, t12_t, t24_t).
+- Ternary select: int, unsigned, float, double, and custom ternary types (t32_t, t64_t).
 - Arithmetic builtins: add, sub, mul, div, mod, neg.
 - Logic builtins: not.
 - Comparison builtins: cmp (returns -1, 0, +1).
@@ -384,14 +429,14 @@ ternary_cond_t before calling helpers. The reference helper header uses a packed
 - Comparison builtin lowering (cmp)
 - Helper function ABI with packed C implementations for testing
 - Test suite covering all implemented operations
-- Builtin ternary type registration (t6_t, t12_t, t24_t, t48_t, t96_t, t192_t)
-- Shift/rotate builtin lowering (t6/t12/t24)
+- Builtin ternary type registration (t32_t, t64_t, t128_t)
+- Shift/rotate builtin lowering (t32/t64)
 - Conversion builtin lowering (tb2t, tt2b, t2f, f2t)
 
 ### Known Limitations
 - GCC 15 API compatibility may still require adjustments
-- Packed ternary helpers currently cover t6/t12/t24 only (no big-int support for t48+)
-- Reference runtime/helpers do not implement t48/t96/t192 operations
+- Packed ternary helpers currently cover t32/t64 only (no big-int support for t128)
+- Reference runtime/helpers do not implement t128 operations
 
 ## Future Extensions
 
@@ -406,9 +451,9 @@ ternary_cond_t before calling helpers. The reference helper header uses a packed
 ## Still Needs Implementation
 
 1. Custom ternary types
-   - Implemented: builtin types t6, t12, t24, t48, t96, t192 (packed 2-bit trits)
+   - Implemented: builtin types t32, t64, t128 (packed 2-bit trits)
    - Implemented: storage ABI for 2-bit trit packing
-   - Remaining: helper/runtime support for t48/t96/t192 (requires big-int support)
+   - Remaining: helper/runtime support for t128 (requires big-int support)
 2. Extended arithmetic operations
    - Implemented: tsub, tdiv, tmod, tneg builtins and helpers
    - Remaining: validation coverage for edge cases and larger widths
@@ -419,10 +464,10 @@ ternary_cond_t before calling helpers. The reference helper header uses a packed
    - Implemented: tcmp builtins and helpers (-1/0/+1)
    - Remaining: validation coverage for edge cases and larger widths
 5. Shifts and rotates
-   - Implemented: trit-based shl/shr/rol/ror builtins and helpers (t6/t12/t24)
+   - Implemented: trit-based shl/shr/rol/ror builtins and helpers (t32/t64)
    - Remaining: validation coverage and larger width support
 6. Type conversions
-   - Implemented: tb2t/tt2b and t2f/f2t builtins and helpers (t6/t12/t24)
+   - Implemented: tb2t/tt2b and t2f/f2t builtins and helpers (t32/t64)
    - Remaining: precise rounding semantics for larger widths
 7. Full ISA integration
    - Missing: Complete mapping to all specified ISA instructions
@@ -433,6 +478,6 @@ ternary_cond_t before calling helpers. The reference helper header uses a packed
 
 ## Priority Order
 
-- High: Helper support for larger ternary widths (t48/t96/t192)
+- High: Helper support for larger ternary widths (t128)
 - Medium: Varargs ABI validation tests for ternary types
 - Low: Optional hardware ISA support for ternary mnemonics

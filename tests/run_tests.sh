@@ -2,9 +2,27 @@
 
 # Run plugin tests
 
-GCC=/opt/homebrew/bin/gcc-15
+# Auto-detect GCC
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    if command -v gcc-15 >/dev/null 2>&1; then
+        GCC=gcc-15
+    elif command -v gcc-14 >/dev/null 2>&1; then
+        GCC=gcc-14
+    elif command -v gcc-13 >/dev/null 2>&1; then
+        GCC=gcc-13
+    else
+        echo "GCC not found on macOS. Install with 'brew install gcc' and use gcc-14 or gcc-15."
+        exit 1
+    fi
+else
+    # Linux or other
+    GCC=gcc
+fi
+
 PLUGIN=../ternary_plugin.so
 
+echo "Using GCC: $GCC"
 echo "Building plugin..."
 cd .. && make && cd tests
 

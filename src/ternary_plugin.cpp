@@ -1,3 +1,8 @@
+#include <map>
+#include <string>
+#include <utility>
+#include <cstdio>
+
 #include <gcc-plugin.h>
 #include <plugin-version.h>
 #include <tree.h>
@@ -13,13 +18,23 @@
 #include <tree-core.h>
 #include <langhooks.h>
 
-#include <map>
-#include <string>
-#include <utility>
-
-#include <cstdio>
+// Undefine conflicting macros from safe-ctype.h
+#undef toupper
+#undef tolower
+#undef isspace
+#undef isprint
+#undef iscntrl
+#undef isupper
+#undef islower
+#undef isalpha
+#undef isalnum
+#undef isdigit
+#undef isgraph
+#undef ispunct
+#undef isxdigit
 #include <cctype>
 #include <cstring>
+#include <cstdint>
 
 extern "C" {
 int plugin_is_GPL_compatible = 1;
@@ -70,6 +85,7 @@ static tree create_selftest_type(unsigned trit_count);
 
 static unsigned long ternary_count = 0;
 static unsigned long lowered_count = 0;
+static unsigned long surviving_count = 0;
 
 static std::map<unsigned, tree> select_decl_cache;
 static std::map<unsigned, unsigned> ternary_type_uids;
@@ -94,9 +110,29 @@ static std::string read_version_file()
     return std::string(buf);
 }
 
+static bool check_gcc_version_compatibility(struct plugin_gcc_version *version)
+{
+    // Supported GCC versions: 9.0 to 15.x
+    int major = 0, minor = 0;
+    if (sscanf(version->basever, "%d.%d", &major, &minor) != 2)
+        return false;
+
+    if (major < 9 || major > 15)
+        return false;
+
+    // Special handling for GCC 15 (newer features)
+    if (major == 15)
+    {
+        // GCC 15 has some API changes, but we handle them with compatibility code
+        inform(UNKNOWN_LOCATION, "ternary plugin: GCC 15 detected, using compatibility mode");
+    }
+
+    return true;
+}
+
 static void run_selftest()
 {
-    tree cond_type = create_selftest_type(6);
+    tree cond_type = create_selftest_type(32);
     tree conv_decl = get_conv_from_ternary_decl("__ternary_tt2b",
                                                 long_long_integer_type_node,
                                                 cond_type);
@@ -129,6 +165,78 @@ static bool get_ternary_type_trits(tree type, unsigned *trit_count)
 
     if (trit_count)
         *trit_count = it->second;
+    return true;
+}
+
+static bool ternary_value_fits_trits(int64_t value, unsigned trit_count)
+{
+    if (trit_count >= 40)
+        return true;
+
+    int64_t pow3 = 1;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        if (pow3 > (INT64_MAX / 3))
+            return true;
+        pow3 *= 3;
+    }
+    const int64_t max_abs = (pow3 - 1) / 2;
+    return value >= -max_abs && value <= max_abs;
+}
+
+static bool ternary_pack_constant(tree value, tree type, tree *out)
+{
+    unsigned trit_count = 0;
+    if (!get_ternary_type_trits(type, &trit_count))
+        return false;
+    if (trit_count > 32)
+        return false;
+    if (!tree_fits_shwi_p(value))
+        return false;
+
+    int64_t logical = tree_to_shwi(value);
+    if (!ternary_value_fits_trits(logical, trit_count))
+        return false;
+
+    uint64_t packed = 0;
+    int64_t v = logical;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int64_t rem = v % 3;
+        v /= 3;
+        if (rem == 2) {
+            rem = -1;
+            v += 1;
+        } else if (rem == -2) {
+            rem = 1;
+            v -= 1;
+        }
+        uint64_t bits = (rem < 0) ? 0U : (rem == 0 ? 1U : 2U);
+        packed |= bits << (2U * i);
+    }
+
+    *out = build_int_cst_type(type, (HOST_WIDE_INT)packed);
+    return true;
+}
+
+static bool ternary_unpack_constant(tree value, tree type, int64_t *out)
+{
+    unsigned trit_count = 0;
+    if (!get_ternary_type_trits(type, &trit_count))
+        return false;
+    if (trit_count > 32)
+        return false;
+    if (!tree_fits_uhwi_p(value))
+        return false;
+
+    uint64_t packed = (uint64_t)tree_to_uhwi(value);
+    int64_t logical = 0;
+    int64_t pow3 = 1;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        unsigned bits = (unsigned)((packed >> (2U * i)) & 0x3U);
+        int trit = (bits == 0U) ? -1 : (bits == 1U ? 0 : 1);
+        logical += (int64_t)trit * pow3;
+        pow3 *= 3;
+    }
+    *out = logical;
     return true;
 }
 
@@ -399,14 +507,60 @@ public:
                     if (opt_trace)
                         inform(gimple_location(stmt), "ternary: found conditional operator");
 
-                    if (!opt_lower)
+                    if (!opt_lower) {
+                        surviving_count++;
                         continue;
+                    }
 
                     maybe_dump_stmt(stmt);
                     tree lhs = gimple_assign_lhs(stmt);
                     tree cond = gimple_assign_rhs1(stmt);
                     tree true_val = gimple_assign_rhs2(stmt);
                     tree false_val = gimple_assign_rhs3(stmt);
+                    tree packed = NULL_TREE;
+
+                    if (TREE_CODE(cond) == INTEGER_CST && ternary_pack_constant(cond, TREE_TYPE(cond), &packed))
+                        cond = packed;
+                    if (TREE_CODE(true_val) == INTEGER_CST && ternary_pack_constant(true_val, TREE_TYPE(true_val), &packed))
+                        true_val = packed;
+                    if (TREE_CODE(false_val) == INTEGER_CST && ternary_pack_constant(false_val, TREE_TYPE(false_val), &packed))
+                        false_val = packed;
+
+                    // Simplify if cond is constant
+                    if (TREE_CODE(cond) == INTEGER_CST) {
+                        bool cond_known = false;
+                        bool cond_zero = false;
+                        if (get_ternary_type_trits(TREE_TYPE(cond), nullptr)) {
+                            int64_t logical = 0;
+                            if (ternary_unpack_constant(cond, TREE_TYPE(cond), &logical)) {
+                                cond_known = true;
+                                cond_zero = (logical == 0);
+                            }
+                        } else {
+                            cond_known = true;
+                            cond_zero = integer_zerop(cond);
+                        }
+                        if (!cond_known)
+                            goto skip_cond_simplify;
+
+                        tree selected_val = cond_zero ? false_val : true_val;
+                        gimple_assign_set_rhs_from_tree(&gsi, selected_val);
+                        lowered_count++;
+                        if (opt_trace)
+                            inform(gimple_location(stmt), "ternary: simplified constant conditional to %s", cond_zero ? "false" : "true");
+                        continue;
+                    }
+skip_cond_simplify:
+
+                    // Simplify if true_val == false_val
+                    if (operand_equal_p(true_val, false_val, 0)) {
+                        gimple_assign_set_rhs_from_tree(&gsi, true_val);
+                        lowered_count++;
+                        if (opt_trace)
+                            inform(gimple_location(stmt), "ternary: simplified conditional with equal branches");
+                        continue;
+                    }
+
                     tree result_type = TREE_TYPE(lhs);
                     tree cond_arg = cond;
                     tree cond_type = TREE_TYPE(cond);
@@ -415,8 +569,10 @@ public:
                         tree conv_decl = get_conv_from_ternary_decl("__ternary_tt2b",
                                                                     long_long_integer_type_node,
                                                                     cond_type);
-                        if (!conv_decl)
+                        if (!conv_decl) {
+                            surviving_count++;
                             continue;
+                        }
 
                         tree tmp = create_tmp_var(long_long_integer_type_node, "ternary_cond");
                         gcall *conv_call = gimple_build_call(conv_decl, 1, cond);
@@ -428,8 +584,10 @@ public:
                     }
 
                     tree decl = get_select_decl(result_type, cond_type);
-                    if (!decl)
+                    if (!decl) {
+                        surviving_count++;
                         continue;
+                    }
 
                     gcall *call = gimple_build_call(decl, 3, cond_arg, true_val, false_val);
                     gimple_call_set_lhs(call, lhs);
@@ -438,6 +596,300 @@ public:
                     if (opt_trace)
                         inform(gimple_location(stmt), "ternary: lowered conditional operator");
                     continue;
+                }
+
+                // Lower operations on ternary types
+                if (is_gimple_assign(stmt) && opt_lower) {
+                    tree lhs = gimple_assign_lhs(stmt);
+                    tree lhs_type = TREE_TYPE(lhs);
+                    unsigned trit_count;
+                    if (get_ternary_type_trits(lhs_type, &trit_count)) {
+                        enum tree_code code = gimple_assign_rhs_code(stmt);
+                        tree arg1 = gimple_assign_rhs1(stmt);
+                        tree arg2 = gimple_assign_rhs2(stmt);
+                        tree packed = NULL_TREE;
+                        int64_t arg1_logical = 0;
+                        int64_t arg2_logical = 0;
+                        bool arg1_const = false;
+                        bool arg2_const = false;
+
+                        if (arg1 && TREE_CODE(arg1) == INTEGER_CST &&
+                            ternary_pack_constant(arg1, TREE_TYPE(arg1), &packed))
+                            arg1 = packed;
+                        if (arg2 && TREE_CODE(arg2) == INTEGER_CST &&
+                            ternary_pack_constant(arg2, TREE_TYPE(arg2), &packed))
+                            arg2 = packed;
+
+                        if (arg1 && TREE_CODE(arg1) == INTEGER_CST &&
+                            ternary_unpack_constant(arg1, lhs_type, &arg1_logical))
+                            arg1_const = true;
+                        if (arg2 && TREE_CODE(arg2) == INTEGER_CST &&
+                            ternary_unpack_constant(arg2, lhs_type, &arg2_logical))
+                            arg2_const = true;
+
+                        if (code == CONVERT_EXPR && arg1 && TREE_CODE(arg1) == INTEGER_CST) {
+                            tree source_type = TREE_TYPE(arg1);
+                            if (INTEGRAL_TYPE_P(source_type) && tree_fits_shwi_p(arg1)) {
+                                tree logical_tree = build_int_cst_type(long_long_integer_type_node, tree_to_shwi(arg1));
+                                if (ternary_pack_constant(logical_tree, lhs_type, &packed)) {
+                                    gimple_assign_set_rhs_from_tree(&gsi, packed);
+                                    lowered_count++;
+                                    if (opt_trace)
+                                        inform(gimple_location(stmt), "ternary: folded constant conversion to ternary type");
+                                    continue;
+                                }
+                            }
+                        }
+
+                        // Check for mixed-type operations
+                        if (arg1 && TREE_TYPE(arg1) != lhs_type) {
+                            unsigned arg1_trits = 0;
+                            if (!get_ternary_type_trits(TREE_TYPE(arg1), &arg1_trits) || arg1_trits != trit_count) {
+                                if (opt_warn)
+                                    warning_at(gimple_location(stmt), 0, "ternary: mixed-type operation %s (lhs: ternary %u trits, arg1: %s) - conversion needed", 
+                                               get_tree_code_name(code), trit_count, INTEGRAL_TYPE_P(TREE_TYPE(arg1)) ? "integer" : "other");
+                                continue;
+                            }
+                        }
+                        if (arg2 && TREE_TYPE(arg2) != lhs_type) {
+                            unsigned arg2_trits = 0;
+                            if (!get_ternary_type_trits(TREE_TYPE(arg2), &arg2_trits) || arg2_trits != trit_count) {
+                                if (opt_warn)
+                                    warning_at(gimple_location(stmt), 0, "ternary: mixed-type operation %s (lhs: ternary %u trits, arg2: %s) - conversion needed", 
+                                               get_tree_code_name(code), trit_count, INTEGRAL_TYPE_P(TREE_TYPE(arg2)) ? "integer" : "other");
+                                continue;
+                            }
+                        }
+
+                        // Constant folding on ternary values
+                        if (code == NEGATE_EXPR && arg1_const) {
+                            tree logical_tree = build_int_cst_type(long_long_integer_type_node, -arg1_logical);
+                            if (ternary_pack_constant(logical_tree, lhs_type, &packed)) {
+                                gimple_assign_set_rhs_from_tree(&gsi, packed);
+                                lowered_count++;
+                                if (opt_trace)
+                                    inform(gimple_location(stmt), "ternary: folded constant negate");
+                                continue;
+                            }
+                        } else if (arg1_const && arg2_const) {
+                            int64_t folded_val = 0;
+                            bool can_fold = true;
+                            if (code == PLUS_EXPR)
+                                folded_val = arg1_logical + arg2_logical;
+                            else if (code == MINUS_EXPR)
+                                folded_val = arg1_logical - arg2_logical;
+                            else if (code == MULT_EXPR)
+                                folded_val = arg1_logical * arg2_logical;
+                            else if (code == TRUNC_DIV_EXPR)
+                                folded_val = (arg2_logical == 0) ? 0 : (arg1_logical / arg2_logical);
+                            else if (code == TRUNC_MOD_EXPR)
+                                folded_val = (arg2_logical == 0) ? 0 : (arg1_logical % arg2_logical);
+                            else
+                                can_fold = false;
+
+                            if (can_fold) {
+                                tree logical_tree = build_int_cst_type(long_long_integer_type_node, folded_val);
+                                if (ternary_pack_constant(logical_tree, lhs_type, &packed)) {
+                                    gimple_assign_set_rhs_from_tree(&gsi, packed);
+                                    lowered_count++;
+                                    if (opt_trace)
+                                        inform(gimple_location(stmt), "ternary: folded constant %s", get_tree_code_name(code));
+                                    continue;
+                                }
+                            }
+                        }
+
+                        // Simplifications
+                        bool simplified = false;
+                        if (code == PLUS_EXPR && arg2_const && arg2_logical == 0) {
+                            // a + 0 = a
+                            gimple_assign_set_rhs_from_tree(&gsi, arg1);
+                            simplified = true;
+                            if (opt_trace)
+                                inform(gimple_location(stmt), "ternary: simplified a + 0 to a");
+                        } else if (code == MINUS_EXPR && arg2_const && arg2_logical == 0) {
+                            // a - 0 = a
+                            gimple_assign_set_rhs_from_tree(&gsi, arg1);
+                            simplified = true;
+                            if (opt_trace)
+                                inform(gimple_location(stmt), "ternary: simplified a - 0 to a");
+                        } else if (code == MULT_EXPR && arg2_const) {
+                            if (arg2_logical == 0) {
+                                // a * 0 = 0
+                                gimple_assign_set_rhs_from_tree(&gsi, arg2);
+                                simplified = true;
+                                if (opt_trace)
+                                    inform(gimple_location(stmt), "ternary: simplified a * 0 to 0");
+                            } else if (arg2_logical == 1) {
+                                // a * 1 = a
+                                gimple_assign_set_rhs_from_tree(&gsi, arg1);
+                                simplified = true;
+                                if (opt_trace)
+                                    inform(gimple_location(stmt), "ternary: simplified a * 1 to a");
+                            }
+                        }
+
+                        if (simplified) {
+                            lowered_count++;
+                            continue;
+                        }
+
+                        const char *helper_name = nullptr;
+                        bool is_shift = false;
+                        if (code == PLUS_EXPR) {
+                            helper_name = "__ternary_add";
+                        } else if (code == MINUS_EXPR) {
+                            helper_name = "__ternary_sub";
+                        } else if (code == MULT_EXPR) {
+                            helper_name = "__ternary_mul";
+                        } else if (code == TRUNC_DIV_EXPR) {
+                            helper_name = "__ternary_div";
+                        } else if (code == TRUNC_MOD_EXPR) {
+                            helper_name = "__ternary_mod";
+                        } else if (code == NEGATE_EXPR) {
+                            helper_name = "__ternary_neg";
+                        } else if (code == BIT_AND_EXPR) {
+                            helper_name = "__ternary_and";
+                        } else if (code == BIT_IOR_EXPR) {
+                            helper_name = "__ternary_or";
+                        } else if (code == BIT_XOR_EXPR) {
+                            helper_name = "__ternary_xor";
+                        } else if (code == LSHIFT_EXPR) {
+                            helper_name = "__ternary_shl";
+                            is_shift = true;
+                        } else if (code == RSHIFT_EXPR) {
+                            helper_name = "__ternary_shr";
+                            is_shift = true;
+                        } else if (code == CONVERT_EXPR) {
+                            tree source = gimple_assign_rhs1(stmt);
+                            tree source_type = TREE_TYPE(source);
+                            if (INTEGRAL_TYPE_P(source_type)) {
+                                helper_name = "__ternary_tb2t";
+                            } else if (SCALAR_FLOAT_TYPE_P(source_type)) {
+                                if (TYPE_PRECISION(source_type) == 32) {
+                                    helper_name = "__ternary_f2t32";
+                                } else if (TYPE_PRECISION(source_type) == 64) {
+                                    helper_name = "__ternary_f2t64";
+                                }
+                            }
+                        }
+                        if (helper_name) {
+                            tree decl;
+                            if (is_shift) {
+                                decl = get_shift_decl(helper_name, lhs_type);
+                            } else if (code == CONVERT_EXPR) {
+                                tree source_type = TREE_TYPE(gimple_assign_rhs1(stmt));
+                                decl = get_conv_to_ternary_decl(helper_name, lhs_type, source_type);
+                            } else {
+                                decl = get_arith_decl(helper_name, lhs_type);
+                            }
+                            if (decl) {
+                                int num_args = (code == NEGATE_EXPR || code == CONVERT_EXPR) ? 1 : 2;
+                                tree arg1 = gimple_assign_rhs1(stmt);
+                                tree arg2 = (num_args == 2) ? gimple_assign_rhs2(stmt) : NULL_TREE;
+                                gcall *call = gimple_build_call(decl, num_args, arg1, arg2);
+                                gimple_call_set_lhs(call, lhs);
+                                gsi_replace(&gsi, call, true);
+                                lowered_count++;
+                                if (opt_trace)
+                                    inform(gimple_location(stmt), "ternary: lowered %s on ternary type", get_tree_code_name(code));
+                            } else {
+                                surviving_count++;
+                                if (opt_warn)
+                                    warning_at(gimple_location(stmt), 0, "ternary: cannot lower %s on ternary type (missing runtime helper for %u trits)", get_tree_code_name(code), trit_count);
+                            }
+                        } else {
+                            surviving_count++;
+                            if (opt_warn)
+                                warning_at(gimple_location(stmt), 0, "ternary: unsupported operation %s on ternary type (operation not implemented)", get_tree_code_name(code));
+                        }
+                    }
+                }
+
+                // Lower comparisons on ternary operands
+                if (is_gimple_assign(stmt) && opt_lower) {
+                    enum tree_code code = gimple_assign_rhs_code(stmt);
+                    if (code == EQ_EXPR || code == NE_EXPR || code == LT_EXPR || code == LE_EXPR || code == GT_EXPR || code == GE_EXPR) {
+                        tree lhs = gimple_assign_lhs(stmt);
+                        tree arg1 = gimple_assign_rhs1(stmt);
+                        tree arg1_type = TREE_TYPE(arg1);
+                        unsigned trit_count;
+                        if (get_ternary_type_trits(arg1_type, &trit_count)) {
+                            tree arg2 = gimple_assign_rhs2(stmt);
+                            tree arg2_type = TREE_TYPE(arg2);
+                            unsigned trit_count2;
+                            if (get_ternary_type_trits(arg2_type, &trit_count2) && trit_count == trit_count2) {
+                                const char *suffix = trit_count == 32 ? "32" : trit_count == 64 ? "64" : trit_count == 128 ? "128" : nullptr;
+                                if (suffix) {
+                                    std::string helper = "__ternary_";
+                                    if (code == EQ_EXPR) helper += "eq";
+                                    else if (code == NE_EXPR) helper += "ne";
+                                    else if (code == LT_EXPR) helper += "lt";
+                                    else if (code == LE_EXPR) helper += "le";
+                                    else if (code == GT_EXPR) helper += "gt";
+                                    else if (code == GE_EXPR) helper += "ge";
+                                    helper += "_t" + std::string(suffix);
+                                    tree fn_type = build_function_type_list(integer_type_node, arg1_type, arg1_type, NULL_TREE);
+                                    tree decl = build_fn_decl(helper.c_str(), fn_type);
+                                    TREE_PUBLIC(decl) = 1;
+                                    DECL_EXTERNAL(decl) = 1;
+                                    DECL_ARTIFICIAL(decl) = 1;
+                                    gcall *call = gimple_build_call(decl, 2, arg1, arg2);
+                                    gimple_call_set_lhs(call, lhs);
+                                    gsi_replace(&gsi, call, true);
+                                    lowered_count++;
+                                    if (opt_trace)
+                                        inform(gimple_location(stmt), "ternary: lowered %s on ternary operands", get_tree_code_name(code));
+                                } else {
+                                    surviving_count++;
+                                    if (opt_warn)
+                                        warning_at(gimple_location(stmt), 0, "ternary: cannot lower %s on ternary operands (unsupported trit count %u)", get_tree_code_name(code), trit_count);
+                                }
+                            } else {
+                                surviving_count++;
+                                if (opt_warn)
+                                    warning_at(gimple_location(stmt), 0, "ternary: %s requires both operands to be ternary types of same size", get_tree_code_name(code));
+                            }
+                        }
+                    }
+                }
+
+                // Lower conversions from ternary types
+                if (is_gimple_assign(stmt) && opt_lower && gimple_assign_rhs_code(stmt) == CONVERT_EXPR) {
+                    tree lhs = gimple_assign_lhs(stmt);
+                    tree lhs_type = TREE_TYPE(lhs);
+                    if (!get_ternary_type_trits(lhs_type, nullptr)) {  // lhs not ternary
+                        tree source = gimple_assign_rhs1(stmt);
+                        tree source_type = TREE_TYPE(source);
+                        unsigned trit_count;
+                        if (get_ternary_type_trits(source_type, &trit_count)) {
+                            const char *helper_name = nullptr;
+                            if (INTEGRAL_TYPE_P(lhs_type)) {
+                                helper_name = "__ternary_tt2b";
+                            } else if (SCALAR_FLOAT_TYPE_P(lhs_type)) {
+                                if (TYPE_PRECISION(lhs_type) == 32) {
+                                    helper_name = "__ternary_t2f32";
+                                } else if (TYPE_PRECISION(lhs_type) == 64) {
+                                    helper_name = "__ternary_t2f64";
+                                }
+                            }
+                            if (helper_name) {
+                                tree decl = get_conv_from_ternary_decl(helper_name, lhs_type, source_type);
+                                if (decl) {
+                                    gcall *call = gimple_build_call(decl, 1, source);
+                                    gimple_call_set_lhs(call, lhs);
+                                    gsi_replace(&gsi, call, true);
+                                    lowered_count++;
+                                    if (opt_trace)
+                                        inform(gimple_location(stmt), "ternary: lowered conversion from ternary type");
+                                } else {
+                                    surviving_count++;
+                                    if (opt_warn)
+                                        warning_at(gimple_location(stmt), 0, "ternary: cannot lower conversion from ternary type to %s (missing runtime helper)", get_tree_code_name(TREE_CODE(lhs_type)));
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if (is_gimple_call(stmt) && (opt_arith || opt_logic || opt_cmp || opt_shift || opt_conv))
@@ -461,6 +913,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_add");
                         }
@@ -476,6 +929,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_mul");
                         }
@@ -491,6 +945,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_sub");
                         }
@@ -506,6 +961,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_div");
                         }
@@ -521,6 +977,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_mod");
                         }
@@ -539,6 +996,7 @@ public:
                             gcall *new_call = gimple_build_call(decl, 1, gimple_call_arg(stmt, 0));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_neg");
                         }
@@ -555,8 +1013,45 @@ public:
                             gcall *new_call = gimple_build_call(decl, 2, arg0, arg1);
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_cmp");
+                        }
+                    }
+                    else if (opt_cmp && (!strcmp(name, "__builtin_ternary_eq") ||
+                                         !strcmp(name, "__builtin_ternary_ne") ||
+                                         !strcmp(name, "__builtin_ternary_lt") ||
+                                         !strcmp(name, "__builtin_ternary_le") ||
+                                         !strcmp(name, "__builtin_ternary_gt") ||
+                                         !strcmp(name, "__builtin_ternary_ge")))
+                    {
+                        tree arg0 = gimple_call_arg(stmt, 0);
+                        tree arg1 = gimple_call_arg(stmt, 1);
+                        tree arg0_type = TREE_TYPE(arg0);
+                        unsigned trit_count;
+                        if (get_ternary_type_trits(arg0_type, &trit_count) && gimple_call_num_args(stmt) == 2)
+                        {
+                            maybe_dump_stmt(stmt);
+                            tree fn_type = build_function_type_list(integer_type_node, arg0_type, arg0_type, NULL_TREE);
+                            const char *helper_name = nullptr;
+                            if (!strcmp(name, "__builtin_ternary_eq")) helper_name = "__ternary_eq";
+                            else if (!strcmp(name, "__builtin_ternary_ne")) helper_name = "__ternary_ne";
+                            else if (!strcmp(name, "__builtin_ternary_lt")) helper_name = "__ternary_lt";
+                            else if (!strcmp(name, "__builtin_ternary_le")) helper_name = "__ternary_le";
+                            else if (!strcmp(name, "__builtin_ternary_gt")) helper_name = "__ternary_gt";
+                            else if (!strcmp(name, "__builtin_ternary_ge")) helper_name = "__ternary_ge";
+                            if (helper_name) {
+                                tree decl = build_fn_decl(helper_name, fn_type);
+                                TREE_PUBLIC(decl) = 1;
+                                DECL_EXTERNAL(decl) = 1;
+                                DECL_ARTIFICIAL(decl) = 1;
+                                gcall *new_call = gimple_build_call(decl, 2, arg0, arg1);
+                                gimple_call_set_lhs(new_call, lhs);
+                                gsi_replace(&gsi, new_call, true);
+                                lowered_count++;
+                                if (opt_trace)
+                                    inform(gimple_location(stmt), "ternary: lowered builtin %s", name);
+                            }
                         }
                     }
                     else if (opt_logic && !strcmp(name, "__builtin_ternary_not"))
@@ -573,6 +1068,7 @@ public:
                             gcall *new_call = gimple_build_call(decl, 1, gimple_call_arg(stmt, 0));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_not");
                         }
@@ -588,6 +1084,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_and");
                         }
@@ -603,6 +1100,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_or");
                         }
@@ -618,6 +1116,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_xor");
                         }
@@ -653,6 +1152,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_shl");
                         }
@@ -668,6 +1168,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_shr");
                         }
@@ -683,6 +1184,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_rol");
                         }
@@ -698,6 +1200,7 @@ public:
                                                                 gimple_call_arg(stmt, 1));
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_ror");
                         }
@@ -712,6 +1215,7 @@ public:
                             gcall *new_call = gimple_build_call(decl, 1, arg0);
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_tb2t");
                         }
@@ -726,6 +1230,7 @@ public:
                             gcall *new_call = gimple_build_call(decl, 1, arg0);
                             gimple_call_set_lhs(new_call, lhs);
                             gsi_replace(&gsi, new_call, true);
+                            lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_tt2b");
                         }
@@ -747,6 +1252,7 @@ public:
                                     gcall *new_call = gimple_build_call(decl, 1, arg0);
                                     gimple_call_set_lhs(new_call, lhs);
                                     gsi_replace(&gsi, new_call, true);
+                                    lowered_count++;
                                     if (opt_trace)
                                         inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_t2f");
                                 }
@@ -770,6 +1276,7 @@ public:
                                     gcall *new_call = gimple_build_call(decl, 1, arg0);
                                     gimple_call_set_lhs(new_call, lhs);
                                     gsi_replace(&gsi, new_call, true);
+                                    lowered_count++;
                                     if (opt_trace)
                                         inform(gimple_location(stmt), "ternary: lowered builtin __builtin_ternary_f2t");
                                 }
@@ -837,25 +1344,28 @@ static void ternary_plugin_init(void *gcc_data, void *user_data)
     if (!opt_types)
         return;
 
-    create_ternary_type(6);
-    create_ternary_type(12);
-    create_ternary_type(24);
-    create_ternary_type(48);
-    create_ternary_type(96);
-    create_ternary_type(192);
+    create_ternary_type(32);
+    create_ternary_type(64);
+    create_ternary_type(128);
 }
 
 static void ternary_plugin_finish(void *, void *)
 {
     if (opt_stats)
-        inform(UNKNOWN_LOCATION, "ternary plugin: %lu ternary ops, %lu lowered",
-               ternary_count, lowered_count);
+        inform(UNKNOWN_LOCATION, "ternary plugin: %lu ternary ops, %lu lowered, %lu surviving gimple ops",
+               ternary_count, lowered_count, surviving_count);
 }
 
 extern "C" int plugin_init(struct plugin_name_args *plugin_info, struct plugin_gcc_version *version)
 {
     if (!plugin_default_version_check(version, &gcc_version))
         return 1;
+
+    if (!check_gcc_version_compatibility(version))
+    {
+        error(0, "ternary plugin: unsupported GCC version %s (supported: 9.0-15.x)", version->basever);
+        return 1;
+    }
 
     parse_args(plugin_info);
     if (opt_version || opt_selftest)

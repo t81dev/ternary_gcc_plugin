@@ -23,7 +23,7 @@ typedef int64_t ternary_cond_t;
  * Non-zero values are treated as true by the select helpers.
  */
 
-/* Define TERNARY_USE_BUILTIN_TYPES to use plugin-provided ternary types (t6_t, t12_t, etc.)
+/* Define TERNARY_USE_BUILTIN_TYPES to use plugin-provided ternary types (t32_t, t64_t, etc.)
  * and avoid typedef conflicts.
  */
 
@@ -165,6 +165,174 @@ static inline uint64_t ternary_rotate_right(uint64_t packed, unsigned trit_count
         unsigned src = (i + shift) % trit_count;
         int trit = ternary_get_trit(packed, src);
         out = ternary_set_trit(out, i, trit);
+    }
+    return out;
+}
+
+static inline int64_t ternary_decode_u128(unsigned __int128 packed, unsigned trit_count) {
+    int64_t value = 0;
+    int64_t pow3 = 1;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        unsigned bits = (unsigned)((packed >> (2U * i)) & 0x3U);
+        int trit = ternary_bits_to_trit(bits);
+        value += (int64_t)trit * pow3;
+        pow3 *= 3;
+    }
+    return value;
+}
+
+static inline unsigned __int128 ternary_encode_u128(int64_t value, unsigned trit_count) {
+    unsigned __int128 packed = 0;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int64_t rem = value % 3;
+        value /= 3;
+
+        if (rem == 2) {
+            rem = -1;
+            value += 1;
+        } else if (rem == -2) {
+            rem = 1;
+            value -= 1;
+        }
+
+        unsigned bits = ternary_trit_to_bits((int)rem);
+        packed |= ((unsigned __int128)bits) << (2U * i);
+    }
+    return packed;
+}
+
+static inline int ternary_parse_bt_str(const char *s, int64_t *out) {
+    int64_t acc = 0;
+    int saw = 0;
+
+    while (s && *s) {
+        char c = *s;
+        int trit = 0;
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f') {
+            ++s;
+            continue;
+        }
+        if (c == ',') {
+            ++s;
+            continue;
+        }
+        if (c == '0') {
+            trit = 0;
+            ++s;
+        } else if (c == '1') {
+            trit = 1;
+            ++s;
+        } else if (c == '+' && s[1] == '1') {
+            trit = 1;
+            s += 2;
+        } else if (c == '-' && s[1] == '1') {
+            trit = -1;
+            s += 2;
+        } else {
+            return 0;
+        }
+
+        saw = 1;
+        if (trit >= 0) {
+            if (acc > (INT64_MAX - trit) / 3)
+                return 0;
+        } else {
+            if (acc < (INT64_MIN - trit) / 3)
+                return 0;
+        }
+        acc = acc * 3 + trit;
+    }
+
+    if (!saw)
+        return 0;
+    *out = acc;
+    return 1;
+}
+
+static inline int ternary_get_trit_u128(unsigned __int128 packed, unsigned idx) {
+    unsigned bits = (unsigned)((packed >> (2U * idx)) & 0x3U);
+    return ternary_bits_to_trit(bits);
+}
+
+static inline unsigned __int128 ternary_set_trit_u128(unsigned __int128 packed, unsigned idx, int trit) {
+    unsigned __int128 mask = (unsigned __int128)0x3U << (2U * idx);
+    unsigned __int128 bits = (unsigned __int128)ternary_trit_to_bits(trit) << (2U * idx);
+    return (packed & ~mask) | bits;
+}
+
+static inline unsigned __int128 ternary_tritwise_op_u128(unsigned __int128 a, unsigned __int128 b,
+                                                         unsigned trit_count, int op) {
+    unsigned __int128 out = 0;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int ta = ternary_get_trit_u128(a, i);
+        int tb = ternary_get_trit_u128(b, i);
+        int trit = 0;
+        if (op == 0)
+            trit = ternary_trit_min(ta, tb);
+        else if (op == 1)
+            trit = ternary_trit_max(ta, tb);
+        else
+            trit = ternary_trit_xor(ta, tb);
+        out = ternary_set_trit_u128(out, i, trit);
+    }
+    return out;
+}
+
+static inline unsigned __int128 ternary_shift_left_u128(unsigned __int128 packed, unsigned trit_count,
+                                                        unsigned shift) {
+    unsigned __int128 out = 0;
+    if (trit_count == 0)
+        return packed;
+    shift %= trit_count;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int trit = 0;
+        if (i >= shift)
+            trit = ternary_get_trit_u128(packed, i - shift);
+        out = ternary_set_trit_u128(out, i, trit);
+    }
+    return out;
+}
+
+static inline unsigned __int128 ternary_shift_right_u128(unsigned __int128 packed, unsigned trit_count,
+                                                         unsigned shift) {
+    unsigned __int128 out = 0;
+    if (trit_count == 0)
+        return packed;
+    shift %= trit_count;
+    int sign_trit = ternary_get_trit_u128(packed, trit_count - 1);
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int trit = sign_trit;
+        if (i + shift < trit_count)
+            trit = ternary_get_trit_u128(packed, i + shift);
+        out = ternary_set_trit_u128(out, i, trit);
+    }
+    return out;
+}
+
+static inline unsigned __int128 ternary_rotate_left_u128(unsigned __int128 packed, unsigned trit_count,
+                                                         unsigned shift) {
+    unsigned __int128 out = 0;
+    if (trit_count == 0)
+        return packed;
+    shift %= trit_count;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        unsigned src = (i + trit_count - shift) % trit_count;
+        int trit = ternary_get_trit_u128(packed, src);
+        out = ternary_set_trit_u128(out, i, trit);
+    }
+    return out;
+}
+
+static inline unsigned __int128 ternary_rotate_right_u128(unsigned __int128 packed, unsigned trit_count,
+                                                          unsigned shift) {
+    unsigned __int128 out = 0;
+    if (trit_count == 0)
+        return packed;
+    shift %= trit_count;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        unsigned src = (i + shift) % trit_count;
+        int trit = ternary_get_trit_u128(packed, src);
+        out = ternary_set_trit_u128(out, i, trit);
     }
     return out;
 }
@@ -314,32 +482,25 @@ static inline double __ternary_select_f64(TERNARY_COND_T cond, double true_val, 
 
 /* Ternary type definitions using packed 2-bit trits. */
 #ifndef TERNARY_USE_BUILTIN_TYPES
-typedef uint16_t t6_t;   /* 6 trits -> 12 bits */
-typedef uint32_t t12_t;  /* 12 trits -> 24 bits */
-typedef uint64_t t24_t;  /* 24 trits -> 48 bits */
+typedef uint64_t t32_t;           /* 32 trits -> 64 bits */
+typedef unsigned __int128 t64_t;  /* 64 trits -> 128 bits */
 #endif
 
 /* Varargs helpers for ternary packed types. */
-#define TERNARY_VA_ARG_T6(ap) ((t6_t)va_arg(ap, int))
-#define TERNARY_VA_ARG_T12(ap) ((t12_t)va_arg(ap, uint32_t))
-#define TERNARY_VA_ARG_T24(ap) ((t24_t)va_arg(ap, uint64_t))
+#define TERNARY_VA_ARG_T32(ap) ((t32_t)va_arg(ap, uint64_t))
+#define TERNARY_VA_ARG_T64(ap) ((t64_t)va_arg(ap, unsigned __int128))
 
-/* Note: t48/t96/t192 helpers are not provided in this header. */
+/* Note: t128 helpers are not provided in this header. */
 
 /* Ternary type select operations */
 
-/* t6 selects */
-static inline t6_t __ternary_select_t6(TERNARY_COND_T cond, t6_t true_val, t6_t false_val) {
+/* t32 selects */
+static inline t32_t __ternary_select_t32(TERNARY_COND_T cond, t32_t true_val, t32_t false_val) {
     return cond ? true_val : false_val;
 }
 
-/* t12 selects */
-static inline t12_t __ternary_select_t12(TERNARY_COND_T cond, t12_t true_val, t12_t false_val) {
-    return cond ? true_val : false_val;
-}
-
-/* t24 selects */
-static inline t24_t __ternary_select_t24(TERNARY_COND_T cond, t24_t true_val, t24_t false_val) {
+/* t64 selects */
+static inline t64_t __ternary_select_t64(TERNARY_COND_T cond, t64_t true_val, t64_t false_val) {
     return cond ? true_val : false_val;
 }
 
@@ -481,288 +642,207 @@ static inline int __ternary_ror(int a, int shift) {
     return a;
 }
 
-/* Ternary type arithmetic operations (t6, t12, t24, etc.) */
+/* Ternary type arithmetic operations (t32, t64, etc.) */
 /* Note: These use the same underlying representation but with ternary semantics */
 
-static inline t6_t __ternary_add_t6(t6_t a, t6_t b) {
-    int64_t va = ternary_decode(a, 6);
-    int64_t vb = ternary_decode(b, 6);
-    return (t6_t)ternary_encode(va + vb, 6);
+static inline t32_t __ternary_add_t32(t32_t a, t32_t b) {
+    int64_t va = ternary_decode(a, 32);
+    int64_t vb = ternary_decode(b, 32);
+    return (t32_t)ternary_encode(va + vb, 32);
 }
 
-static inline t6_t __ternary_mul_t6(t6_t a, t6_t b) {
-    int64_t va = ternary_decode(a, 6);
-    int64_t vb = ternary_decode(b, 6);
-    return (t6_t)ternary_encode(va * vb, 6);
+static inline t32_t __ternary_mul_t32(t32_t a, t32_t b) {
+    int64_t va = ternary_decode(a, 32);
+    int64_t vb = ternary_decode(b, 32);
+    return (t32_t)ternary_encode(va * vb, 32);
 }
 
-static inline t6_t __ternary_not_t6(t6_t a) {
-    int64_t va = ternary_decode(a, 6);
-    return (t6_t)ternary_encode(-va, 6);
+static inline t32_t __ternary_not_t32(t32_t a) {
+    int64_t va = ternary_decode(a, 32);
+    return (t32_t)ternary_encode(-va, 32);
 }
 
-static inline t6_t __ternary_sub_t6(t6_t a, t6_t b) {
-    int64_t va = ternary_decode(a, 6);
-    int64_t vb = ternary_decode(b, 6);
-    return (t6_t)ternary_encode(va - vb, 6);
+static inline t32_t __ternary_sub_t32(t32_t a, t32_t b) {
+    int64_t va = ternary_decode(a, 32);
+    int64_t vb = ternary_decode(b, 32);
+    return (t32_t)ternary_encode(va - vb, 32);
 }
 
-static inline t6_t __ternary_div_t6(t6_t a, t6_t b) {
-    int64_t va = ternary_decode(a, 6);
-    int64_t vb = ternary_decode(b, 6);
-    return (t6_t)ternary_encode(vb == 0 ? 0 : va / vb, 6);
+static inline t32_t __ternary_div_t32(t32_t a, t32_t b) {
+    int64_t va = ternary_decode(a, 32);
+    int64_t vb = ternary_decode(b, 32);
+    return (t32_t)ternary_encode(vb == 0 ? 0 : va / vb, 32);
 }
 
-static inline t6_t __ternary_mod_t6(t6_t a, t6_t b) {
-    int64_t va = ternary_decode(a, 6);
-    int64_t vb = ternary_decode(b, 6);
-    return (t6_t)ternary_encode(vb == 0 ? 0 : va % vb, 6);
+static inline t32_t __ternary_mod_t32(t32_t a, t32_t b) {
+    int64_t va = ternary_decode(a, 32);
+    int64_t vb = ternary_decode(b, 32);
+    return (t32_t)ternary_encode(vb == 0 ? 0 : va % vb, 32);
 }
 
-static inline t6_t __ternary_neg_t6(t6_t a) {
-    int64_t va = ternary_decode(a, 6);
-    return (t6_t)ternary_encode(-va, 6);
+static inline t32_t __ternary_neg_t32(t32_t a) {
+    int64_t va = ternary_decode(a, 32);
+    return (t32_t)ternary_encode(-va, 32);
 }
 
-static inline t6_t __ternary_and_t6(t6_t a, t6_t b) {
-    return (t6_t)ternary_tritwise_op(a, b, 6, 0);
+static inline t32_t __ternary_and_t32(t32_t a, t32_t b) {
+    return (t32_t)ternary_tritwise_op(a, b, 32, 0);
 }
 
-static inline t6_t __ternary_or_t6(t6_t a, t6_t b) {
-    return (t6_t)ternary_tritwise_op(a, b, 6, 1);
+static inline t32_t __ternary_or_t32(t32_t a, t32_t b) {
+    return (t32_t)ternary_tritwise_op(a, b, 32, 1);
 }
 
-static inline t6_t __ternary_xor_t6(t6_t a, t6_t b) {
-    return (t6_t)ternary_tritwise_op(a, b, 6, 2);
+static inline t32_t __ternary_xor_t32(t32_t a, t32_t b) {
+    return (t32_t)ternary_tritwise_op(a, b, 32, 2);
 }
 
-static inline t6_t __ternary_shl_t6(t6_t a, int shift) {
-    return (t6_t)ternary_shift_left(a, 6, (unsigned)shift);
+static inline t32_t __ternary_shl_t32(t32_t a, int shift) {
+    return (t32_t)ternary_shift_left(a, 32, (unsigned)shift);
 }
 
-static inline t6_t __ternary_shr_t6(t6_t a, int shift) {
-    return (t6_t)ternary_shift_right(a, 6, (unsigned)shift);
+static inline t32_t __ternary_shr_t32(t32_t a, int shift) {
+    return (t32_t)ternary_shift_right(a, 32, (unsigned)shift);
 }
 
-static inline t6_t __ternary_rol_t6(t6_t a, int shift) {
-    return (t6_t)ternary_rotate_left(a, 6, (unsigned)shift);
+static inline t32_t __ternary_rol_t32(t32_t a, int shift) {
+    return (t32_t)ternary_rotate_left(a, 32, (unsigned)shift);
 }
 
-static inline t6_t __ternary_ror_t6(t6_t a, int shift) {
-    return (t6_t)ternary_rotate_right(a, 6, (unsigned)shift);
+static inline t32_t __ternary_ror_t32(t32_t a, int shift) {
+    return (t32_t)ternary_rotate_right(a, 32, (unsigned)shift);
 }
 
-static inline t6_t __ternary_tb2t_t6(int64_t v) {
-    return (t6_t)ternary_encode(v, 6);
+static inline t32_t __ternary_tb2t_t32(int64_t v) {
+    return (t32_t)ternary_encode(v, 32);
 }
 
-static inline int64_t __ternary_tt2b_t6(t6_t v) {
-    return ternary_decode(v, 6);
+static inline int64_t __ternary_tt2b_t32(t32_t v) {
+    return ternary_decode(v, 32);
 }
 
-static inline float __ternary_t2f32_t6(t6_t v) {
-    return (float)ternary_decode(v, 6);
+static inline float __ternary_t2f32_t32(t32_t v) {
+    return (float)ternary_decode(v, 32);
 }
 
-static inline double __ternary_t2f64_t6(t6_t v) {
-    return (double)ternary_decode(v, 6);
+static inline double __ternary_t2f64_t32(t32_t v) {
+    return (double)ternary_decode(v, 32);
 }
 
-static inline t6_t __ternary_f2t32_t6(float v) {
-    return (t6_t)ternary_encode((int64_t)v, 6);
+static inline t32_t __ternary_f2t32_t32(float v) {
+    return (t32_t)ternary_encode((int64_t)v, 32);
 }
 
-static inline t6_t __ternary_f2t64_t6(double v) {
-    return (t6_t)ternary_encode((int64_t)v, 6);
+static inline t32_t __ternary_f2t64_t32(double v) {
+    return (t32_t)ternary_encode((int64_t)v, 32);
 }
 
-/* t12 operations (12 trits) */
-
-static inline t12_t __ternary_add_t12(t12_t a, t12_t b) {
-    int64_t va = ternary_decode(a, 12);
-    int64_t vb = ternary_decode(b, 12);
-    return (t12_t)ternary_encode(va + vb, 12);
+static inline t32_t __ternary_bt_str_t32(const char *s) {
+    int64_t value = 0;
+    if (!ternary_parse_bt_str(s, &value))
+        return 0;
+    return (t32_t)ternary_encode(value, 32);
 }
 
-static inline t12_t __ternary_mul_t12(t12_t a, t12_t b) {
-    int64_t va = ternary_decode(a, 12);
-    int64_t vb = ternary_decode(b, 12);
-    return (t12_t)ternary_encode(va * vb, 12);
+static inline t64_t __ternary_add_t64(t64_t a, t64_t b) {
+    int64_t va = ternary_decode_u128(a, 64);
+    int64_t vb = ternary_decode_u128(b, 64);
+    return (t64_t)ternary_encode_u128(va + vb, 64);
 }
 
-static inline t12_t __ternary_not_t12(t12_t a) {
-    int64_t va = ternary_decode(a, 12);
-    return (t12_t)ternary_encode(-va, 12);
+static inline t64_t __ternary_mul_t64(t64_t a, t64_t b) {
+    int64_t va = ternary_decode_u128(a, 64);
+    int64_t vb = ternary_decode_u128(b, 64);
+    return (t64_t)ternary_encode_u128(va * vb, 64);
 }
 
-static inline t12_t __ternary_sub_t12(t12_t a, t12_t b) {
-    int64_t va = ternary_decode(a, 12);
-    int64_t vb = ternary_decode(b, 12);
-    return (t12_t)ternary_encode(va - vb, 12);
+static inline t64_t __ternary_not_t64(t64_t a) {
+    int64_t va = ternary_decode_u128(a, 64);
+    return (t64_t)ternary_encode_u128(-va, 64);
 }
 
-static inline t12_t __ternary_div_t12(t12_t a, t12_t b) {
-    int64_t va = ternary_decode(a, 12);
-    int64_t vb = ternary_decode(b, 12);
-    return (t12_t)ternary_encode(vb == 0 ? 0 : va / vb, 12);
+static inline t64_t __ternary_sub_t64(t64_t a, t64_t b) {
+    int64_t va = ternary_decode_u128(a, 64);
+    int64_t vb = ternary_decode_u128(b, 64);
+    return (t64_t)ternary_encode_u128(va - vb, 64);
 }
 
-static inline t12_t __ternary_mod_t12(t12_t a, t12_t b) {
-    int64_t va = ternary_decode(a, 12);
-    int64_t vb = ternary_decode(b, 12);
-    return (t12_t)ternary_encode(vb == 0 ? 0 : va % vb, 12);
+static inline t64_t __ternary_div_t64(t64_t a, t64_t b) {
+    int64_t va = ternary_decode_u128(a, 64);
+    int64_t vb = ternary_decode_u128(b, 64);
+    return (t64_t)ternary_encode_u128(vb == 0 ? 0 : va / vb, 64);
 }
 
-static inline t12_t __ternary_neg_t12(t12_t a) {
-    int64_t va = ternary_decode(a, 12);
-    return (t12_t)ternary_encode(-va, 12);
+static inline t64_t __ternary_mod_t64(t64_t a, t64_t b) {
+    int64_t va = ternary_decode_u128(a, 64);
+    int64_t vb = ternary_decode_u128(b, 64);
+    return (t64_t)ternary_encode_u128(vb == 0 ? 0 : va % vb, 64);
 }
 
-static inline t12_t __ternary_and_t12(t12_t a, t12_t b) {
-    return (t12_t)ternary_tritwise_op(a, b, 12, 0);
+static inline t64_t __ternary_neg_t64(t64_t a) {
+    int64_t va = ternary_decode_u128(a, 64);
+    return (t64_t)ternary_encode_u128(-va, 64);
 }
 
-static inline t12_t __ternary_or_t12(t12_t a, t12_t b) {
-    return (t12_t)ternary_tritwise_op(a, b, 12, 1);
+static inline t64_t __ternary_and_t64(t64_t a, t64_t b) {
+    return (t64_t)ternary_tritwise_op_u128(a, b, 64, 0);
 }
 
-static inline t12_t __ternary_xor_t12(t12_t a, t12_t b) {
-    return (t12_t)ternary_tritwise_op(a, b, 12, 2);
+static inline t64_t __ternary_or_t64(t64_t a, t64_t b) {
+    return (t64_t)ternary_tritwise_op_u128(a, b, 64, 1);
 }
 
-static inline t12_t __ternary_shl_t12(t12_t a, int shift) {
-    return (t12_t)ternary_shift_left(a, 12, (unsigned)shift);
+static inline t64_t __ternary_xor_t64(t64_t a, t64_t b) {
+    return (t64_t)ternary_tritwise_op_u128(a, b, 64, 2);
 }
 
-static inline t12_t __ternary_shr_t12(t12_t a, int shift) {
-    return (t12_t)ternary_shift_right(a, 12, (unsigned)shift);
+static inline t64_t __ternary_shl_t64(t64_t a, int shift) {
+    return (t64_t)ternary_shift_left_u128(a, 64, (unsigned)shift);
 }
 
-static inline t12_t __ternary_rol_t12(t12_t a, int shift) {
-    return (t12_t)ternary_rotate_left(a, 12, (unsigned)shift);
+static inline t64_t __ternary_shr_t64(t64_t a, int shift) {
+    return (t64_t)ternary_shift_right_u128(a, 64, (unsigned)shift);
 }
 
-static inline t12_t __ternary_ror_t12(t12_t a, int shift) {
-    return (t12_t)ternary_rotate_right(a, 12, (unsigned)shift);
+static inline t64_t __ternary_rol_t64(t64_t a, int shift) {
+    return (t64_t)ternary_rotate_left_u128(a, 64, (unsigned)shift);
 }
 
-static inline t12_t __ternary_tb2t_t12(int64_t v) {
-    return (t12_t)ternary_encode(v, 12);
+static inline t64_t __ternary_ror_t64(t64_t a, int shift) {
+    return (t64_t)ternary_rotate_right_u128(a, 64, (unsigned)shift);
 }
 
-static inline int64_t __ternary_tt2b_t12(t12_t v) {
-    return ternary_decode(v, 12);
+static inline t64_t __ternary_tb2t_t64(int64_t v) {
+    return (t64_t)ternary_encode_u128(v, 64);
 }
 
-static inline float __ternary_t2f32_t12(t12_t v) {
-    return (float)ternary_decode(v, 12);
+static inline int64_t __ternary_tt2b_t64(t64_t v) {
+    return ternary_decode_u128(v, 64);
 }
 
-static inline double __ternary_t2f64_t12(t12_t v) {
-    return (double)ternary_decode(v, 12);
+static inline float __ternary_t2f32_t64(t64_t v) {
+    return (float)ternary_decode_u128(v, 64);
 }
 
-static inline t12_t __ternary_f2t32_t12(float v) {
-    return (t12_t)ternary_encode((int64_t)v, 12);
+static inline double __ternary_t2f64_t64(t64_t v) {
+    return (double)ternary_decode_u128(v, 64);
 }
 
-static inline t12_t __ternary_f2t64_t12(double v) {
-    return (t12_t)ternary_encode((int64_t)v, 12);
+static inline t64_t __ternary_f2t32_t64(float v) {
+    return (t64_t)ternary_encode_u128((int64_t)v, 64);
 }
 
-/* t24 operations (24 trits) */
-
-static inline t24_t __ternary_add_t24(t24_t a, t24_t b) {
-    int64_t va = ternary_decode(a, 24);
-    int64_t vb = ternary_decode(b, 24);
-    return (t24_t)ternary_encode(va + vb, 24);
+static inline t64_t __ternary_f2t64_t64(double v) {
+    return (t64_t)ternary_encode_u128((int64_t)v, 64);
 }
 
-static inline t24_t __ternary_mul_t24(t24_t a, t24_t b) {
-    int64_t va = ternary_decode(a, 24);
-    int64_t vb = ternary_decode(b, 24);
-    return (t24_t)ternary_encode(va * vb, 24);
+static inline t64_t __ternary_bt_str_t64(const char *s) {
+    int64_t value = 0;
+    if (!ternary_parse_bt_str(s, &value))
+        return 0;
+    return (t64_t)ternary_encode_u128(value, 64);
 }
 
-static inline t24_t __ternary_not_t24(t24_t a) {
-    int64_t va = ternary_decode(a, 24);
-    return (t24_t)ternary_encode(-va, 24);
-}
-
-static inline t24_t __ternary_sub_t24(t24_t a, t24_t b) {
-    int64_t va = ternary_decode(a, 24);
-    int64_t vb = ternary_decode(b, 24);
-    return (t24_t)ternary_encode(va - vb, 24);
-}
-
-static inline t24_t __ternary_div_t24(t24_t a, t24_t b) {
-    int64_t va = ternary_decode(a, 24);
-    int64_t vb = ternary_decode(b, 24);
-    return (t24_t)ternary_encode(vb == 0 ? 0 : va / vb, 24);
-}
-
-static inline t24_t __ternary_mod_t24(t24_t a, t24_t b) {
-    int64_t va = ternary_decode(a, 24);
-    int64_t vb = ternary_decode(b, 24);
-    return (t24_t)ternary_encode(vb == 0 ? 0 : va % vb, 24);
-}
-
-static inline t24_t __ternary_neg_t24(t24_t a) {
-    int64_t va = ternary_decode(a, 24);
-    return (t24_t)ternary_encode(-va, 24);
-}
-
-static inline t24_t __ternary_and_t24(t24_t a, t24_t b) {
-    return (t24_t)ternary_tritwise_op(a, b, 24, 0);
-}
-
-static inline t24_t __ternary_or_t24(t24_t a, t24_t b) {
-    return (t24_t)ternary_tritwise_op(a, b, 24, 1);
-}
-
-static inline t24_t __ternary_xor_t24(t24_t a, t24_t b) {
-    return (t24_t)ternary_tritwise_op(a, b, 24, 2);
-}
-
-static inline t24_t __ternary_shl_t24(t24_t a, int shift) {
-    return (t24_t)ternary_shift_left(a, 24, (unsigned)shift);
-}
-
-static inline t24_t __ternary_shr_t24(t24_t a, int shift) {
-    return (t24_t)ternary_shift_right(a, 24, (unsigned)shift);
-}
-
-static inline t24_t __ternary_rol_t24(t24_t a, int shift) {
-    return (t24_t)ternary_rotate_left(a, 24, (unsigned)shift);
-}
-
-static inline t24_t __ternary_ror_t24(t24_t a, int shift) {
-    return (t24_t)ternary_rotate_right(a, 24, (unsigned)shift);
-}
-
-static inline t24_t __ternary_tb2t_t24(int64_t v) {
-    return (t24_t)ternary_encode(v, 24);
-}
-
-static inline int64_t __ternary_tt2b_t24(t24_t v) {
-    return ternary_decode(v, 24);
-}
-
-static inline float __ternary_t2f32_t24(t24_t v) {
-    return (float)ternary_decode(v, 24);
-}
-
-static inline double __ternary_t2f64_t24(t24_t v) {
-    return (double)ternary_decode(v, 24);
-}
-
-static inline t24_t __ternary_f2t32_t24(float v) {
-    return (t24_t)ternary_encode((int64_t)v, 24);
-}
-
-static inline t24_t __ternary_f2t64_t24(double v) {
-    return (t24_t)ternary_encode((int64_t)v, 24);
-}
 /* Ternary comparison operations (return -1, 0, +1) */
 static inline int __ternary_cmp(int a, int b) {
     if (a < b) return -1;
@@ -770,25 +850,17 @@ static inline int __ternary_cmp(int a, int b) {
     return 0;
 }
 
-static inline int __ternary_cmp_t6(t6_t a, t6_t b) {
-    int64_t va = ternary_decode(a, 6);
-    int64_t vb = ternary_decode(b, 6);
+static inline int __ternary_cmp_t32(t32_t a, t32_t b) {
+    int64_t va = ternary_decode(a, 32);
+    int64_t vb = ternary_decode(b, 32);
     if (va < vb) return -1;
     if (va > vb) return 1;
     return 0;
 }
 
-static inline int __ternary_cmp_t12(t12_t a, t12_t b) {
-    int64_t va = ternary_decode(a, 12);
-    int64_t vb = ternary_decode(b, 12);
-    if (va < vb) return -1;
-    if (va > vb) return 1;
-    return 0;
-}
-
-static inline int __ternary_cmp_t24(t24_t a, t24_t b) {
-    int64_t va = ternary_decode(a, 24);
-    int64_t vb = ternary_decode(b, 24);
+static inline int __ternary_cmp_t64(t64_t a, t64_t b) {
+    int64_t va = ternary_decode_u128(a, 64);
+    int64_t vb = ternary_decode_u128(b, 64);
     if (va < vb) return -1;
     if (va > vb) return 1;
     return 0;

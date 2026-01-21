@@ -14,17 +14,15 @@ typedef int64_t ternary_cond_t;
 #endif
 
 #ifndef TERNARY_USE_BUILTIN_TYPES
-typedef uint16_t t6_t;   /* 6 trits -> 12 bits */
-typedef uint32_t t12_t;  /* 12 trits -> 24 bits */
-typedef uint64_t t24_t;  /* 24 trits -> 48 bits */
+typedef uint64_t t32_t;           /* 32 trits -> 64 bits */
+typedef unsigned __int128 t64_t;  /* 64 trits -> 128 bits */
 #endif
 
 /* Varargs helpers for ternary packed types. */
-#define TERNARY_VA_ARG_T6(ap) ((t6_t)va_arg(ap, int))
-#define TERNARY_VA_ARG_T12(ap) ((t12_t)va_arg(ap, uint32_t))
-#define TERNARY_VA_ARG_T24(ap) ((t24_t)va_arg(ap, uint64_t))
+#define TERNARY_VA_ARG_T32(ap) ((t32_t)va_arg(ap, uint64_t))
+#define TERNARY_VA_ARG_T64(ap) ((t64_t)va_arg(ap, unsigned __int128))
 
-/* Note: t48/t96/t192 helpers are not provided in this header. */
+/* Note: t128 helpers are not provided in this header. */
 
 /* Select helpers for standard types. */
 int __ternary_select_i8(TERNARY_COND_T cond, int true_val, int false_val);
@@ -40,9 +38,8 @@ float __ternary_select_f32(TERNARY_COND_T cond, float true_val, float false_val)
 double __ternary_select_f64(TERNARY_COND_T cond, double true_val, double false_val);
 
 /* Select helpers for ternary packed types. */
-t6_t __ternary_select_t6(TERNARY_COND_T cond, t6_t true_val, t6_t false_val);
-t12_t __ternary_select_t12(TERNARY_COND_T cond, t12_t true_val, t12_t false_val);
-t24_t __ternary_select_t24(TERNARY_COND_T cond, t24_t true_val, t24_t false_val);
+t32_t __ternary_select_t32(TERNARY_COND_T cond, t32_t true_val, t32_t false_val);
+t64_t __ternary_select_t64(TERNARY_COND_T cond, t64_t true_val, t64_t false_val);
 
 /* Integer ternary ops (balanced ternary semantics). */
 int __ternary_add(int a, int b);
@@ -61,72 +58,52 @@ int __ternary_rol(int a, int shift);
 int __ternary_ror(int a, int shift);
 int __ternary_cmp(int a, int b);
 
-/* Packed ternary ops for t6/t12/t24. */
-t6_t __ternary_add_t6(t6_t a, t6_t b);
-t6_t __ternary_mul_t6(t6_t a, t6_t b);
-t6_t __ternary_not_t6(t6_t a);
-t6_t __ternary_sub_t6(t6_t a, t6_t b);
-t6_t __ternary_div_t6(t6_t a, t6_t b);
-t6_t __ternary_mod_t6(t6_t a, t6_t b);
-t6_t __ternary_neg_t6(t6_t a);
-t6_t __ternary_and_t6(t6_t a, t6_t b);
-t6_t __ternary_or_t6(t6_t a, t6_t b);
-t6_t __ternary_xor_t6(t6_t a, t6_t b);
-t6_t __ternary_shl_t6(t6_t a, int shift);
-t6_t __ternary_shr_t6(t6_t a, int shift);
-t6_t __ternary_rol_t6(t6_t a, int shift);
-t6_t __ternary_ror_t6(t6_t a, int shift);
-t6_t __ternary_tb2t_t6(int64_t v);
-int64_t __ternary_tt2b_t6(t6_t v);
-float __ternary_t2f32_t6(t6_t v);
-double __ternary_t2f64_t6(t6_t v);
-t6_t __ternary_f2t32_t6(float v);
-t6_t __ternary_f2t64_t6(double v);
-int __ternary_cmp_t6(t6_t a, t6_t b);
+/* Packed ternary ops for t32/t64. */
+t32_t __ternary_add_t32(t32_t a, t32_t b);
+t32_t __ternary_mul_t32(t32_t a, t32_t b);
+t32_t __ternary_not_t32(t32_t a);
+t32_t __ternary_sub_t32(t32_t a, t32_t b);
+t32_t __ternary_div_t32(t32_t a, t32_t b);
+t32_t __ternary_mod_t32(t32_t a, t32_t b);
+t32_t __ternary_neg_t32(t32_t a);
+t32_t __ternary_and_t32(t32_t a, t32_t b);
+t32_t __ternary_or_t32(t32_t a, t32_t b);
+t32_t __ternary_xor_t32(t32_t a, t32_t b);
+t32_t __ternary_shl_t32(t32_t a, int shift);
+t32_t __ternary_shr_t32(t32_t a, int shift);
+t32_t __ternary_rol_t32(t32_t a, int shift);
+t32_t __ternary_ror_t32(t32_t a, int shift);
+t32_t __ternary_tb2t_t32(int64_t v);
+int64_t __ternary_tt2b_t32(t32_t v);
+float __ternary_t2f32_t32(t32_t v);
+double __ternary_t2f64_t32(t32_t v);
+t32_t __ternary_f2t32_t32(float v);
+t32_t __ternary_f2t64_t32(double v);
+int __ternary_cmp_t32(t32_t a, t32_t b);
+t32_t __ternary_bt_str_t32(const char *s);
 
-t12_t __ternary_add_t12(t12_t a, t12_t b);
-t12_t __ternary_mul_t12(t12_t a, t12_t b);
-t12_t __ternary_not_t12(t12_t a);
-t12_t __ternary_sub_t12(t12_t a, t12_t b);
-t12_t __ternary_div_t12(t12_t a, t12_t b);
-t12_t __ternary_mod_t12(t12_t a, t12_t b);
-t12_t __ternary_neg_t12(t12_t a);
-t12_t __ternary_and_t12(t12_t a, t12_t b);
-t12_t __ternary_or_t12(t12_t a, t12_t b);
-t12_t __ternary_xor_t12(t12_t a, t12_t b);
-t12_t __ternary_shl_t12(t12_t a, int shift);
-t12_t __ternary_shr_t12(t12_t a, int shift);
-t12_t __ternary_rol_t12(t12_t a, int shift);
-t12_t __ternary_ror_t12(t12_t a, int shift);
-t12_t __ternary_tb2t_t12(int64_t v);
-int64_t __ternary_tt2b_t12(t12_t v);
-float __ternary_t2f32_t12(t12_t v);
-double __ternary_t2f64_t12(t12_t v);
-t12_t __ternary_f2t32_t12(float v);
-t12_t __ternary_f2t64_t12(double v);
-int __ternary_cmp_t12(t12_t a, t12_t b);
-
-t24_t __ternary_add_t24(t24_t a, t24_t b);
-t24_t __ternary_mul_t24(t24_t a, t24_t b);
-t24_t __ternary_not_t24(t24_t a);
-t24_t __ternary_sub_t24(t24_t a, t24_t b);
-t24_t __ternary_div_t24(t24_t a, t24_t b);
-t24_t __ternary_mod_t24(t24_t a, t24_t b);
-t24_t __ternary_neg_t24(t24_t a);
-t24_t __ternary_and_t24(t24_t a, t24_t b);
-t24_t __ternary_or_t24(t24_t a, t24_t b);
-t24_t __ternary_xor_t24(t24_t a, t24_t b);
-t24_t __ternary_shl_t24(t24_t a, int shift);
-t24_t __ternary_shr_t24(t24_t a, int shift);
-t24_t __ternary_rol_t24(t24_t a, int shift);
-t24_t __ternary_ror_t24(t24_t a, int shift);
-t24_t __ternary_tb2t_t24(int64_t v);
-int64_t __ternary_tt2b_t24(t24_t v);
-float __ternary_t2f32_t24(t24_t v);
-double __ternary_t2f64_t24(t24_t v);
-t24_t __ternary_f2t32_t24(float v);
-t24_t __ternary_f2t64_t24(double v);
-int __ternary_cmp_t24(t24_t a, t24_t b);
+t64_t __ternary_add_t64(t64_t a, t64_t b);
+t64_t __ternary_mul_t64(t64_t a, t64_t b);
+t64_t __ternary_not_t64(t64_t a);
+t64_t __ternary_sub_t64(t64_t a, t64_t b);
+t64_t __ternary_div_t64(t64_t a, t64_t b);
+t64_t __ternary_mod_t64(t64_t a, t64_t b);
+t64_t __ternary_neg_t64(t64_t a);
+t64_t __ternary_and_t64(t64_t a, t64_t b);
+t64_t __ternary_or_t64(t64_t a, t64_t b);
+t64_t __ternary_xor_t64(t64_t a, t64_t b);
+t64_t __ternary_shl_t64(t64_t a, int shift);
+t64_t __ternary_shr_t64(t64_t a, int shift);
+t64_t __ternary_rol_t64(t64_t a, int shift);
+t64_t __ternary_ror_t64(t64_t a, int shift);
+t64_t __ternary_tb2t_t64(int64_t v);
+int64_t __ternary_tt2b_t64(t64_t v);
+float __ternary_t2f32_t64(t64_t v);
+double __ternary_t2f64_t64(t64_t v);
+t64_t __ternary_f2t32_t64(float v);
+t64_t __ternary_f2t64_t64(double v);
+int __ternary_cmp_t64(t64_t a, t64_t b);
+t64_t __ternary_bt_str_t64(const char *s);
 
 #ifdef __cplusplus
 }

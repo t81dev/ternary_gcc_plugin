@@ -4,8 +4,10 @@ This is a GCC plugin and helper ABI for a balanced-ternary ISA. It analyzes tern
 expressions in C/C++ and can lower them to helper calls that map to ternary ISA
 instructions.
 
+**Note:** This project is a passion/research effort exploring ternary logic, which has theoretical advantages in arithmetic and AI contexts. It is currently at an early stage, compiling and running toy examples, rather than a mature toolchain component.
+
 The plugin supports:
-- Packed ternary types: `t6_t`, `t12_t`, `t24_t` (6, 12, 24 trits; 2-bit packed encoding)
+- Packed ternary types: `t32_t`, `t64_t`, `t128_t` (32/64/128 trits; 2-bit packed encoding)
 - Extended arithmetic operations: add, sub, mul, div, mod, neg
 - Logic operations: not
 - Comparison operations: cmp (returns -1, 0, +1)
@@ -19,10 +21,10 @@ described in `SPECIFICATION.md`.
 
 Balanced ternary offers symmetric range and simpler arithmetic compared to two's complement binary.
 
-| Aspect | Balanced Ternary (e.g., 12 trits, 24 bits) | Two's Complement (e.g., 24-bit int) |
-|--------|--------------------------------------------|-------------------------------------|
-| Range  | -531441 to 531441                          | -8388608 to 8388607                |
-| Dynamic Range | Higher for same bits (3^12 vs 2^24)     | Standard binary range              |
+| Aspect | Balanced Ternary (e.g., 32 trits, 64 bits) | Two's Complement (e.g., 64-bit int) |
+|--------|-------------------------------------------|-------------------------------------|
+| Range  | -926510094425920 to 926510094425920       | -9223372036854775808 to 9223372036854775807 |
+| Dynamic Range | 3^32 vs 2^64                        | Standard binary range              |
 | Rounding | Symmetric (no bias toward positive/negative) | Biased toward negative             |
 | Arithmetic Simplicity | Easier carry-free ops in hardware | Complex carry propagation          |
 
@@ -47,6 +49,8 @@ make install
 ```
 
 This installs to `/usr/local/lib` and `/usr/local/include/ternary` by default. Adjust `DESTDIR` if needed.
+
+**Note:** On macOS, Apple Clang does not support GCC plugins. Use Homebrew GCC (e.g., `gcc-14` or `gcc-15`) instead.
 
 ### macOS Users - Important!
 
@@ -133,8 +137,8 @@ Optional arguments:
   `__builtin_ternary_shl`, `__builtin_ternary_shr`, `__builtin_ternary_rol`, and `__builtin_ternary_ror`.
 - `-fplugin-arg-ternary_plugin-conv` enables lowering of ternary conversion builtins like
   `__builtin_ternary_tb2t`, `__builtin_ternary_tt2b`, `__builtin_ternary_t2f`, and `__builtin_ternary_f2t`.
-- `-fplugin-arg-ternary_plugin-types` enables builtin ternary integer types `t6_t`, `t12_t`,
-  `t24_t`, `t48_t`, `t96_t`, `t192_t` with packed 2-bit trit storage.
+- `-fplugin-arg-ternary_plugin-types` enables builtin ternary integer types `t32_t`, `t64_t`,
+  `t128_t` with packed 2-bit trit storage.
 - `-fplugin-arg-ternary_plugin-prefix=<name>` sets the function name prefix used by `-lower`
   (default: `__ternary_select`).
 
@@ -161,8 +165,9 @@ For testing without the plugin, the header provides C implementations of all ter
 Packed ternary types use a 2-bit encoding per trit (00 = -1, 01 = 0, 10 = +1).
 Define `TERNARY_USE_BUILTIN_TYPES` before including the header when compiling with
 `-fplugin-arg-ternary_plugin-types` to avoid typedef conflicts.
-Helper/runtime support is currently provided for t6/t12/t24 only; t48/t96/t192 require
-custom runtime implementations.
+Helper/runtime support is currently provided for t32/t64 only; t128 requires
+custom runtime implementations. The reference runtime uses 64-bit logical
+conversion helpers, so t64 correctness is limited to values that fit in int64.
 
 For example:
 
@@ -185,13 +190,46 @@ gcc -fplugin=./ternary_plugin.so -fplugin-arg-ternary_plugin-lower -Iinclude -c 
 
 For a minimal out-of-line runtime, use the reference implementation in `runtime/ternary_runtime.c`
 with the public header `include/ternary_runtime.h`. It implements the same packed 2-bit-trit
-semantics as the helpers (t6/t12/t24) and is intended as a starting point for a real ISA-backed
-library. Packed helpers for t48/t96/t192 are not provided in this reference runtime.
+semantics as the helpers (t32/t64) and is intended as a starting point for a real ISA-backed
+library. Packed helpers for t128 are not provided in this reference runtime.
 
 Example build:
 
 ```bash
 cc -Iinclude -c runtime/ternary_runtime.c -o ternary_runtime.o
+```
+
+The `runtime_skeleton/` directory includes a tiny standalone helper set plus a sanity-check
+test you can build and run:
+
+```bash
+mkdir -p build
+cc -Iruntime_skeleton/include runtime_skeleton/src/ternary_runtime_skeleton.c \
+  runtime_skeleton/test_runtime_skeleton.c -o build/runtime_skeleton_test
+./build/runtime_skeleton_test
+```
+
+## Godbolt Recipe (Local-Equivalent)
+
+Godbolt does not allow custom GCC plugins, so use the local equivalent command line to reproduce
+what you would run in Compiler Explorer with a plugin-enabled GCC build:
+
+```bash
+cc -fplugin=./ternary_plugin.so \
+  -fplugin-arg-ternary_plugin-types \
+  -fplugin-arg-ternary_plugin-lower \
+  -fplugin-arg-ternary_plugin-arith \
+  -fplugin-arg-ternary_plugin-logic \
+  -fplugin-arg-ternary_plugin-cmp \
+  -fplugin-arg-ternary_plugin-shift \
+  -fplugin-arg-ternary_plugin-conv \
+  -Iinclude -c examples/ternary_basic.c -o build/ternary_basic.o
+```
+
+Link with the reference runtime object to satisfy helper symbols:
+
+```bash
+cc build/ternary_basic.o runtime/ternary_runtime.o -o build/ternary_basic
 ```
 
 ## Testing
@@ -216,12 +254,23 @@ make test CXX=g++-15 CC=gcc-15
 This plugin analyzes ternary conditional expressions in the code and can optionally
 lower ternary operations to helper calls suitable for targeting a balanced-ternary ISA.
 
+## Balanced Ternary Literals
+
+Use balanced-ternary strings to construct packed values:
+
+```c
+t32_t a = T32_BT_STR("1 0 -1 1");
+t64_t b = T64_BT_STR("1,0,0,-1");
+```
+
+The parser consumes trits from left to right (most significant to least significant).
+
 ## Known Limitations
 
 - No auto-vectorization for ternary operations yet.
 - Performance is reference implementation; optimized ternary hardware would excel.
 - Limited interaction testing with GCC optimizations (-O3 may affect lowering).
-- No support for ternary literals or advanced syntax beyond builtins.
+- No native literal syntax; use the balanced-ternary string macros.
 - Plugin requires GCC with plugin support (not available in all distributions).
 
 ## Examples
