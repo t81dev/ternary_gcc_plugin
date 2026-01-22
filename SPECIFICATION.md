@@ -151,6 +151,7 @@ intended to be exposed via the GCC plugin and helper ABI.
 - tand: per-trit min(a, b)
 - tor: per-trit max(a, b)
 - txor: ternary XOR (ISA-defined and stable)
+- tequiv: tritwise equivalence (Kleene XNOR) that propagates unknowns and returns +1 only when the inputs match.
 - tmin: per-trit minimum (alias of tand, optional)
 - tmax: per-trit maximum (alias of tor, optional)
 
@@ -165,12 +166,14 @@ intended to be exposed via the GCC plugin and helper ABI.
 - tmuladd: ternary multiply-add with symmetric rounding (A×B + C)
 - tround: drop least-significant trits with symmetric rounding bias
 - tabs: absolute value (optional helper if not encoded in hardware)
+- tnet: net trit sum (count(+1) − count(−1)) for fast majority/balance checks.
 
 ### Ternary Comparison and Condition Ops
 
 - tcmp: ternary compare returning {-1, 0, +1}
 - tsel: select with ternary condition (cond != 0)
 - tcmpz: compare against zero, returning {-1, 0, +1} (optional shortcut)
+- tmux: data multiplexer that selects among three operands based on a ternary control trit (-1,0,+1).
 
 ### Trit Shifts and Rotates
 

@@ -44,6 +44,18 @@ focuses on instructions whose semantics *literally require* a three-valued persp
   | two or more `0` values           | 0      |
   | two or more `−1` values          | −1     |
   | `(-1, 0, +1)` (all distinct)     | 0      |
+- **TEQUIV** – Tritwise equivalence (balanced ternary XNOR). Returns +1 if both trits match and are non-zero, 0 if either trit is 0, and −1 otherwise. This provides a symmetric similarity test without losing unknown propagation (unlike chaining binary XNOR).
+  | input ↓ \ input → | -1 | 0 | +1 |
+  |------------------|----|---|----|
+  | -1               | +1 | 0 | -1 |
+  | 0                | 0  | 0 | 0  |
+  | +1               | -1 | 0 | +1 |
+- **TXOR** – Tritwise exclusive-or (a + b mod 3). Outputs 0 when inputs match, ±1 when they differ, and keeps unknowns as neutral. Ideal for ternary hashing/diff operations where sign matters but zero must stay neutral.
+  | input ↓ \ input → | -1 | 0 | +1 |
+  |------------------|----|---|----|
+  | -1               | 0  | -1 | +1 |
+  | 0                | -1 | 0  | +1 |
+  | +1               | +1 | -1 | 0  |
 
 ### 2. Control flow that uses three-way decisions
 
@@ -54,6 +66,9 @@ focuses on instructions whose semantics *literally require* a three-valued persp
 - **TSIGNJMP** – Jump based on the sign trit of a register (positive/zero/negative), letting
   late-stage code skip redundant compares or flags. A binary design must inspect zero and sign
   flags separately, but balanced ternary exposes the sign trit directly.
+- **TMUX** – Three-way data multiplexer controlled by a ternary trit. Chooses operand A for −1,
+  B for 0, and C for +1, mirroring `TBRANCH`’s select logic but for data paths. This avoids chained
+  binary muxes in ternary state machines and pairs with the async control arbiter metadata.
 
 ### 3. Symmetric arithmetic helpers for AI / DSP workloads
 
@@ -71,6 +86,7 @@ focuses on instructions whose semantics *literally require* a three-valued persp
   AI weights. Binary quantization typically lands at {0,1} or 8-bit ints; ternary quantization
   captures more information with fewer bits. This helper is critical for runtime math that
   prepares data for `TMIN/TMAX`-style activations.
+- **TNET** – Net trit sum: emit the count of `+1` values minus the count of `−1` values within a register. Balanced ternary makes this reduction carry-free and perfectly symmetric, serving as a lightweight “balance” check for ternary neural networks or error-detecting schemes.
 
 ### 4. Memory / conversion utilities beyond standard packing
 

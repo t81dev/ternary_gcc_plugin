@@ -72,6 +72,24 @@ int main(void)
     expect_int("tsignjmp_zero", __ternary_tsignjmp_t64(__ternary_tb2t_t64(0), -1, 0, 1), 0);
     expect_int("tsignjmp_pos", __ternary_tsignjmp_t64(__ternary_tb2t_t64(3), -1, 0, 1), 1);
 
+    expect_int("tequiv_true", __ternary_tt2b_t32(__ternary_tequiv_t32(pos, pos)), 1);
+    expect_int("tequiv_unknown", __ternary_tt2b_t32(__ternary_tequiv_t32(zero, pos)), 0);
+    expect_int("tequiv_false", __ternary_tt2b_t32(__ternary_tequiv_t32(pos, neg)), -1);
+
+    expect_int("txor_zero", __ternary_tt2b_t32(__ternary_txor_t32(pos, neg)), 0);
+    expect_int("txor_diff", __ternary_tt2b_t32(__ternary_txor_t32(pos, zero)), 1);
+    expect_int("txor_same", __ternary_tt2b_t32(__ternary_txor_t32(pos, pos)), -1);
+
+    t32_t mux_lo = __ternary_tb2t_t32(1);
+    t32_t mux_mid = __ternary_tb2t_t32(0);
+    t32_t mux_hi = __ternary_tb2t_t32(-1);
+    expect_int("tmux_neg", __ternary_tt2b_t32(__ternary_tmux_t32(__ternary_tb2t_t32(-1), mux_lo, mux_mid, mux_hi)), 1);
+    expect_int("tmux_zero", __ternary_tt2b_t32(__ternary_tmux_t32(__ternary_tb2t_t32(0), mux_lo, mux_mid, mux_hi)), 0);
+    expect_int("tmux_pos", __ternary_tt2b_t32(__ternary_tmux_t32(__ternary_tb2t_t32(1), mux_lo, mux_mid, mux_hi)), -1);
+
+    expect_int("tnet_one", __ternary_tnet_t32(__ternary_tb2t_t32(1)), 1);
+    expect_int("tnet_minus", __ternary_tnet_t32(__ternary_tb2t_t32(-1)), -1);
+
     tv64_t v_lo = { __ternary_tb2t_t64(1), __ternary_tb2t_t64(2) };
     tv64_t v_hi = { __ternary_tb2t_t64(3), __ternary_tb2t_t64(-1) };
     tv64_t added = __ternary_add_tv64(v_lo, v_hi);
