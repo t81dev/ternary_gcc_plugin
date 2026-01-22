@@ -41,10 +41,12 @@ Deliverables:
 - Expand lowering to cover all defined intrinsics and ternary ops.
 - Ensure safe handling for unsupported types and conditions.
 - Add diagnostics for unsupported or ambiguous cases.
+- Track Phase 3/4 regression coverage (lowering + diagnostics) with a dedicated script/log so each milestone emits a clear artifact.
 
 Deliverables:
 - Plugin coverage test suite in `tests/`.
 - GIMPLE-based regression tests (golden output or dg tests).
+- `tests/run_phase34_coverage.sh` + `tests/PHASE34_COVERAGE.md` document the targeted entries and log file for upcoming checkpoints.
 
 ## Phase 4: Optimization and Codegen Validation
 
@@ -82,7 +84,8 @@ Deliverables:
 - Document supported platform/compiler versions and current status.
 - Add ABI validation checks in CI (symbol presence or hash).
 - Ensure the documented helper ABI (`SPECIFICATION.md`/README) stays aligned with the headers
-  (`include/ternary_runtime.h`, `include/ternary_helpers.h`), ideally via a CI regression.
+  (`include/ternary_runtime.h`, `include/ternary_helpers.h`), ideally via a CI regression triggered by
+  `tools/check_helper_docs.py` so README/SPEC restructure stays aligned with the header order.
 
 Deliverables:
 - Compatibility matrix in `README.md`.

@@ -447,6 +447,8 @@ helper implementations can be shared between plugin tests and downstream runtime
   `__ternary_tt2b_t64`, `__ternary_t2f32_t32`, `__ternary_t2f32_t64`, `__ternary_t2f64_t32`,
   `__ternary_t2f64_t64`, `__ternary_f2t32_t32`, `__ternary_f2t32_t64`, `__ternary_f2t64_t32`,
   `__ternary_f2t64_t64`.
+- **Conversion helpers (t128, when `_BitInt(256)` is available)**:
+  `__ternary_tb2t_t128`, `__ternary_tt2b_t128`.
 - **Memory helpers**: `__ternary_load_t32`, `__ternary_store_t32`, `__ternary_load_t64`,
   `__ternary_store_t64`.
 - **Vector SIMD helpers**: `__ternary_add_tv32`, `__ternary_sub_tv32`, `__ternary_mul_tv32`,

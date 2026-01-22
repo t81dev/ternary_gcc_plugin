@@ -1348,6 +1348,16 @@ t128_t __ternary_tmux_t128(t128_t sel, t128_t neg, t128_t zero, t128_t pos)
 {
     return ternary_tmux_u128(sel, neg, zero, pos);
 }
+
+t128_t __ternary_tb2t_t128(int64_t v)
+{
+    return ternary_encode_t128(v, 128);
+}
+
+int64_t __ternary_tt2b_t128(t128_t v)
+{
+    return ternary_decode_t128(v, 128);
+}
 #endif
 
 t32_t __ternary_load_t32(const void *addr)

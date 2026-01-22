@@ -164,6 +164,8 @@ t128_t __ternary_tmux_t128(t128_t sel, t128_t neg, t128_t zero, t128_t pos);
 t128_t __ternary_tequiv_t128(t128_t a, t128_t b);
 t128_t __ternary_txor_t128(t128_t a, t128_t b);
 int __ternary_tnet_t128(t128_t a);
+int64_t __ternary_tt2b_t128(t128_t v);
+t128_t __ternary_tb2t_t128(int64_t v);
 #endif
 
 /* Ternary-specific comparison operations for t64 (return ternary results) */

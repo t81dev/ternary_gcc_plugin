@@ -27,31 +27,31 @@ echo "Building plugin..."
 cd .. && make && cd tests
 
 echo "Testing lowering..."
-$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-lower -I../include -c ../test_ternary.c -o test_lower.o
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-lower -I../include -c test_ternary.c -o test_lower.o
 
 echo "Testing arithmetic..."
-$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-arith -I../include -c ../test_ternary.c -o test_arith.o
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-arith -I../include -c test_ternary.c -o test_arith.o
 
 echo "Testing logic..."
-$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-logic -I../include -c ../test_ternary.c -o test_logic.o
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-logic -I../include -c test_ternary.c -o test_logic.o
 
 echo "Testing comparisons..."
-$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-cmp -I../include -c ../test_ternary.c -o test_cmp.o
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-cmp -I../include -c test_ternary.c -o test_cmp.o
 
 echo "Testing shifts..."
-$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-shift -I../include -c ../test_ternary.c -o test_shift.o
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-shift -I../include -c test_ternary.c -o test_shift.o
 
 echo "Testing conversions..."
-$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-conv -I../include -c ../test_ternary.c -o test_conv.o
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-conv -I../include -c test_ternary.c -o test_conv.o
 
 echo "Testing types..."
-$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-types -I../include -c ../test_ternary.c -o test_types.o
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-types -I../include -c test_ternary.c -o test_types.o
 
 echo "Testing literals/promotion macros..."
 $GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-types -I../include -c test_literals.c -o test_literals.o
 
 echo "Testing gimple/dump features..."
 $GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-lower \
-     -fplugin-arg-ternary_plugin-dump-gimple -I../include -c ../test_ternary.c -o test_dump.o
+     -fplugin-arg-ternary_plugin-dump-gimple -I../include -c test_ternary.c -o test_dump.o
 
 echo "All plugin tests compiled successfully."

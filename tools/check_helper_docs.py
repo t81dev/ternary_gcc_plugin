@@ -21,8 +21,9 @@ HEADER_FILES = [
     BASE_DIR / "include" / "ternary_helpers.h",
 ]
 DOC_FILES = [
-    BASE_DIR / "SPECIFICATION.md",
+    BASE_DIR / "docs" / "SPECIFICATION.md",
     BASE_DIR / "README.md",
+    BASE_DIR / "docs" / "README.md",
 ]
 
 PATTERN = re.compile(r"(__ternary_[A-Za-z0-9_]+)\s*\(")
@@ -65,8 +66,8 @@ def main() -> int:
         for name in missing:
             print(f"  - {name}")
         print(
-            "\nUpdate SPECIFICATION.md/README.md (and any linked documentation) "
-            "so the helper list references these symbols."
+        "\nUpdate the README(s) and docs/SPECIFICATION.md (and any linked documentation) "
+        "so the helper list references these symbols."
         )
         return 1
 
