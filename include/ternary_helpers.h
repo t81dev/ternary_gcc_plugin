@@ -14,6 +14,9 @@
 
 #include <stdint.h>
 #include <stdarg.h>
+#define TERNARY_PLUGIN_SKIP_BT_STR
+#include "ternary_plugin.h"
+#undef TERNARY_PLUGIN_SKIP_BT_STR
 
 #ifdef __cplusplus
 extern "C" {
@@ -871,6 +874,57 @@ static inline int __ternary_cmp_t64(t64_t a, t64_t b) {
     if (va > vb) return 1;
     return 0;
 }
+
+/* Extended helper declarations that mirror the runtime implementations. */
+extern t32_t __ternary_tmin_t32(t32_t a, t32_t b);
+extern t32_t __ternary_tmax_t32(t32_t a, t32_t b);
+extern t32_t __ternary_tmaj_t32(t32_t a, t32_t b, t32_t c);
+extern t32_t __ternary_tlimp_t32(t32_t antecedent, t32_t consequent);
+extern t32_t __ternary_tquant_t32(float value, float threshold);
+extern t32_t __ternary_tnot_t32(t32_t a);
+extern t32_t __ternary_tinv_t32(t32_t a);
+extern t32_t __ternary_tmuladd_t32(t32_t a, t32_t b, t32_t c);
+extern t32_t __ternary_tround_t32(t32_t a, unsigned drop);
+extern t32_t __ternary_tnormalize_t32(t32_t a);
+extern t32_t __ternary_tbias_t32(t32_t a, int64_t bias);
+extern t32_t __ternary_tmux_t32(t32_t sel, t32_t neg, t32_t zero, t32_t pos);
+extern t32_t __ternary_tequiv_t32(t32_t a, t32_t b);
+extern t32_t __ternary_txor_t32(t32_t a, t32_t b);
+extern int __ternary_tnet_t32(t32_t a);
+
+extern t64_t __ternary_tmin_t64(t64_t a, t64_t b);
+extern t64_t __ternary_tmax_t64(t64_t a, t64_t b);
+extern t64_t __ternary_tmaj_t64(t64_t a, t64_t b, t64_t c);
+extern t64_t __ternary_tlimp_t64(t64_t antecedent, t64_t consequent);
+extern t64_t __ternary_tquant_t64(double value, double threshold);
+extern t64_t __ternary_tnot_t64(t64_t a);
+extern t64_t __ternary_tinv_t64(t64_t a);
+extern t64_t __ternary_tmuladd_t64(t64_t a, t64_t b, t64_t c);
+extern t64_t __ternary_tround_t64(t64_t a, unsigned drop);
+extern t64_t __ternary_tnormalize_t64(t64_t a);
+extern t64_t __ternary_tbias_t64(t64_t a, int64_t bias);
+extern t64_t __ternary_tmux_t64(t64_t sel, t64_t neg, t64_t zero, t64_t pos);
+extern t64_t __ternary_tequiv_t64(t64_t a, t64_t b);
+extern t64_t __ternary_txor_t64(t64_t a, t64_t b);
+extern int __ternary_tnet_t64(t64_t a);
+
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+extern t128_t __ternary_tmin_t128(t128_t a, t128_t b);
+extern t128_t __ternary_tmax_t128(t128_t a, t128_t b);
+extern t128_t __ternary_tmaj_t128(t128_t a, t128_t b, t128_t c);
+extern t128_t __ternary_tlimp_t128(t128_t antecedent, t128_t consequent);
+extern t128_t __ternary_tquant_t128(double value, double threshold);
+extern t128_t __ternary_tnot_t128(t128_t a);
+extern t128_t __ternary_tinv_t128(t128_t a);
+extern t128_t __ternary_tmuladd_t128(t128_t a, t128_t b, t128_t c);
+extern t128_t __ternary_tround_t128(t128_t a, unsigned drop);
+extern t128_t __ternary_tnormalize_t128(t128_t a);
+extern t128_t __ternary_tbias_t128(t128_t a, int64_t bias);
+extern t128_t __ternary_tmux_t128(t128_t sel, t128_t neg, t128_t zero, t128_t pos);
+extern t128_t __ternary_tequiv_t128(t128_t a, t128_t b);
+extern t128_t __ternary_txor_t128(t128_t a, t128_t b);
+extern int __ternary_tnet_t128(t128_t a);
+#endif
 #ifdef __cplusplus
 }
 #endif

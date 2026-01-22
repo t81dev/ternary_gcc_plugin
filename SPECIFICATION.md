@@ -311,6 +311,9 @@ Branches use ternary conditions:
 - brt cond, label: branch if cond != 0
 - brf cond, label: branch if cond == 0
 
+Hardware implementers can reference `ENCODING.md` for the tryte field layout that packs the
+conditional helpers (TBRANCH/TMUX) plus the family/flag bits used by the async arbiter described in `MASTER_ISA.md`.
+
 Ternary-aware helpers like `tbranch` and `tsignjmp` (see `MASTER_ISA.md`) allow
 three-way control-flow selection or sign-directed jumps without chaining binary
 flags, matching Setun’s triple-transition model.
@@ -418,6 +421,25 @@ helper implementations can be shared between plugin tests and downstream runtime
   `__ternary_xor_t32`, `__ternary_xor_t64`, `__ternary_shl_t32`, `__ternary_shl_t64`,
   `__ternary_shr_t32`, `__ternary_shr_t64`, `__ternary_rol_t32`, `__ternary_rol_t64`,
   `__ternary_ror_t32`, `__ternary_ror_t64`.
+- **Packed ternary logic helpers** (AI-friendly semantics):
+  `__ternary_tmin_t32`, `__ternary_tmin_t64`, `__ternary_tmax_t32`, `__ternary_tmax_t64`,
+  `__ternary_tmaj_t32`, `__ternary_tmaj_t64`, `__ternary_tlimp_t32`, `__ternary_tlimp_t64`,
+  `__ternary_tquant_t32`, `__ternary_tquant_t64`, `__ternary_tquant_tv32`,
+  `__ternary_tnot_t32`, `__ternary_tnot_t64`, `__ternary_tmuladd_t32`,
+  `__ternary_tmuladd_t64`, `__ternary_tround_t32`, `__ternary_tround_t64`,
+  `__ternary_tround_tv32`, `__ternary_tnormalize_t32`, `__ternary_tnormalize_t64`,
+  `__ternary_tbias_t32`, `__ternary_tbias_t64`, `__ternary_tmux_t32`,
+  `__ternary_tmux_t64`, `__ternary_tequiv_t32`, `__ternary_tequiv_t64`,
+  `__ternary_txor_t32`, `__ternary_txor_t64`, `__ternary_tnet_t32`,
+  `__ternary_tnet_t64`.
+- **Packed ternary logic helpers (t128, when `_BitInt(256)` is available)**:
+  `__ternary_tmin_t128`, `__ternary_tmax_t128`, `__ternary_tmaj_t128`,
+  `__ternary_tlimp_t128`, `__ternary_tquant_t128`, `__ternary_tnot_t128`,
+  `__ternary_tinv_t128`, `__ternary_tmuladd_t128`, `__ternary_tround_t128`,
+  `__ternary_tnormalize_t128`, `__ternary_tbias_t128`, `__ternary_tmux_t128`,
+  `__ternary_tequiv_t128`, `__ternary_txor_t128`, `__ternary_tnet_t128`.
+- **Ternary control helpers**: `__ternary_tbranch`, `__ternary_tsignjmp_t32`,
+  `__ternary_tsignjmp_t64`.
 - **Packed ternary comparisons (ternary results)**: `__ternary_cmplt_t32`, `__ternary_cmplt_t64`,
   `__ternary_cmpeq_t32`, `__ternary_cmpeq_t64`, `__ternary_cmpgt_t32`, `__ternary_cmpgt_t64`,
   `__ternary_cmpneq_t32`, `__ternary_cmpneq_t64`.
@@ -473,10 +495,18 @@ packed 2-bit trit encoding (00 = -1, 01 = 0, 10 = +1).
 - Shift/rotate builtin lowering (t32/t64)
 - Conversion builtin lowering (tb2t, tt2b, t2f, f2t)
 
+### Extended helper ABI
+
+- Three-way selector helpers: `__ternary_tmux_t32`, `__ternary_tmux_t64`, `__ternary_tmux_t128`.
+- Kleene equivalence helpers: `__ternary_tequiv_t32`, `__ternary_tequiv_t64`, `__ternary_tequiv_t128`.
+- Ternary-exclusive-or helpers: `__ternary_txor_t32`, `__ternary_txor_t64`, `__ternary_txor_t128`.
+- Net-sum helpers: `__ternary_tnet_t32`, `__ternary_tnet_t64`, `__ternary_tnet_t128`.
+- Demonstrated via the TMUX/TNET/TNN runtime skeleton demo, including t32/t64/t128 workloads.
+
 ### Known Limitations
 - GCC 15 API compatibility may still require adjustments
-- Packed ternary helpers currently cover t32/t64 only (no big-int support for t128)
-- Reference runtime/helpers do not implement t128 operations
+- Packed ternary helpers require `__BITINT_MAXWIDTH__ >= 256` for native `t128_t`; fallback paths mirror the two-`t64_t` layout.
+- Reference runtime/helpers only simulate t128 operations when the compiler exposes `_BitInt(256)` support.
 
 ## Future Extensions
 

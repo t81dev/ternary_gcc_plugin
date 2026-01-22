@@ -182,11 +182,57 @@ int main(void)
     expect_i64("t32_tquant", TERNARY_RUNTIME_SYM(tt2b_t32)(t32_quant),
                 TERNARY_RUNTIME_SYM(tt2b_t32)(expected_quant));
 
+    expect_i64("tequiv_true", TERNARY_RUNTIME_SYM(tt2b_t32)(TERNARY_RUNTIME_SYM(tequiv_t32)(t32_a, t32_a)), 1);
+    expect_i64("tequiv_zero", TERNARY_RUNTIME_SYM(tt2b_t32)(TERNARY_RUNTIME_SYM(tequiv_t32)(t32_a, t32_c)), 0);
+    expect_i64("txor_diff", TERNARY_RUNTIME_SYM(tt2b_t32)(TERNARY_RUNTIME_SYM(txor_t32)(t32_a, t32_c)), -1);
+    expect_int("tnet_positive", TERNARY_RUNTIME_SYM(tnet_t32)(t32_a), 5);
+
+    t32_t mux_selector = TERNARY_RUNTIME_SYM(tb2t_t32)(-1);
+    t32_t mux_result = TERNARY_RUNTIME_SYM(tmux_t32)(mux_selector, t32_a, t32_b, t32_c);
+    expect_i64("tmux_select_neg", TERNARY_RUNTIME_SYM(tt2b_t32)(mux_result), 5);
+    mux_selector = TERNARY_RUNTIME_SYM(tb2t_t32)(0);
+    mux_result = TERNARY_RUNTIME_SYM(tmux_t32)(mux_selector, t32_a, t32_b, t32_c);
+    expect_i64("tmux_select_zero", TERNARY_RUNTIME_SYM(tt2b_t32)(mux_result), -2);
+
     t64_t t64_a = TERNARY_RUNTIME_SYM(tb2t_t64)(7);
     t64_t t64_b = TERNARY_RUNTIME_SYM(tb2t_t64)(4);
     t64_t t64_mod = TERNARY_RUNTIME_SYM(mod_t64)(t64_a, t64_b);
     expect_i64("t64_mod", TERNARY_RUNTIME_SYM(tt2b_t64)(t64_mod), 3);
     expect_int("t64_cmp", TERNARY_RUNTIME_SYM(cmp_t64)(t64_b, t64_a), -1);
+
+    expect_i64("t64_tnet", TERNARY_RUNTIME_SYM(tnet_t64)(TERNARY_RUNTIME_SYM(tb2t_t64)(6)), 6);
+    t64_t t64_cond = TERNARY_RUNTIME_SYM(tb2t_t64)(-1);
+    t64_t t64_mux = TERNARY_RUNTIME_SYM(tmux_t64)(t64_cond,
+                                                  TERNARY_RUNTIME_SYM(tb2t_t64)(3),
+                                                  TERNARY_RUNTIME_SYM(tb2t_t64)(0),
+                                                  TERNARY_RUNTIME_SYM(tb2t_t64)(5));
+    expect_i64("t64_tmux_neg", TERNARY_RUNTIME_SYM(tt2b_t64)(t64_mux), 3);
+    t64_cond = TERNARY_RUNTIME_SYM(tb2t_t64)(0);
+    t64_mux = TERNARY_RUNTIME_SYM(tmux_t64)(t64_cond,
+                                            TERNARY_RUNTIME_SYM(tb2t_t64)(3),
+                                            TERNARY_RUNTIME_SYM(tb2t_t64)(0),
+                                            TERNARY_RUNTIME_SYM(tb2t_t64)(5));
+    expect_i64("t64_tmux_zero", TERNARY_RUNTIME_SYM(tt2b_t64)(t64_mux), 0);
+    expect_i64("t64_tequiv", TERNARY_RUNTIME_SYM(tt2b_t64)(
+        TERNARY_RUNTIME_SYM(tequiv_t64)(t64_a, t64_a)), 1);
+    expect_i64("t64_txor", TERNARY_RUNTIME_SYM(tt2b_t64)(
+        TERNARY_RUNTIME_SYM(txor_t64)(t64_a, TERNARY_RUNTIME_SYM(tb2t_t64)(0))), -1);
+
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+    t128_t t128_a = TERNARY_RUNTIME_SYM(tb2t_t128)(7);
+    t128_t t128_b = TERNARY_RUNTIME_SYM(tb2t_t128)(-3);
+    expect_i64("t128_tnet", TERNARY_RUNTIME_SYM(tnet_t128)(t128_a), 7);
+    t128_t t128_cond = TERNARY_RUNTIME_SYM(tb2t_t128)(1);
+    t128_t t128_mux = TERNARY_RUNTIME_SYM(tmux_t128)(t128_cond,
+                                                      TERNARY_RUNTIME_SYM(tb2t_t128)(-4),
+                                                      TERNARY_RUNTIME_SYM(tb2t_t128)(0),
+                                                      TERNARY_RUNTIME_SYM(tb2t_t128)(8));
+    expect_i64("t128_tmux_pos", TERNARY_RUNTIME_SYM(tt2b_t128)(t128_mux), 8);
+    expect_i64("t128_tequiv", TERNARY_RUNTIME_SYM(tt2b_t128)(
+        TERNARY_RUNTIME_SYM(tequiv_t128)(t128_a, t128_a)), 1);
+    expect_i64("t128_txor", TERNARY_RUNTIME_SYM(tt2b_t128)(
+        TERNARY_RUNTIME_SYM(txor_t128)(t128_a, TERNARY_RUNTIME_SYM(tb2t_t128)(0))), -1);
+#endif
 
     if (fail_count == 0) {
         printf("runtime_skeleton: ok\n");

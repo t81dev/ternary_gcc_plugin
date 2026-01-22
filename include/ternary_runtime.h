@@ -16,16 +16,21 @@ typedef int64_t ternary_cond_t;
 #ifndef TERNARY_USE_BUILTIN_TYPES
 typedef uint64_t t32_t;           /* 32 trits -> 64 bits */
 typedef unsigned __int128 t64_t;  /* 64 trits -> 128 bits */
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+typedef unsigned _BitInt(256) t128_t; /* 128 trits -> 256 bits */
+#endif
 typedef unsigned __int128 tv32_t; /* vector of 2 x t32_t (128 bits) */
 typedef struct { unsigned __int128 lo, hi; } tv64_t; /* vector of 2 x t64_t (256 bits) */
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
 typedef struct { unsigned __int128 lo, hi; } tv128_t; /* vector of 2 x t128_t (512 bits) */
+#endif
 #endif
 
 /* Varargs helpers for ternary packed types. */
 #define TERNARY_VA_ARG_T32(ap) ((t32_t)va_arg(ap, uint64_t))
 #define TERNARY_VA_ARG_T64(ap) ((t64_t)va_arg(ap, unsigned __int128))
 
-/* Note: t128 helpers are not provided in this header. */
+/* t128 helpers are exposed when `_BitInt(256)` is available at compile time. */
 
 /* Select helpers for standard types. */
 int __ternary_select_i8(TERNARY_COND_T cond, int true_val, int false_val);
@@ -142,6 +147,24 @@ t64_t __ternary_f2t32_t64(float v);
 t64_t __ternary_f2t64_t64(double v);
 int __ternary_cmp_t64(t64_t a, t64_t b);
 t64_t __ternary_bt_str_t64(const char *s);
+
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+t128_t __ternary_tmin_t128(t128_t a, t128_t b);
+t128_t __ternary_tmax_t128(t128_t a, t128_t b);
+t128_t __ternary_tmaj_t128(t128_t a, t128_t b, t128_t c);
+t128_t __ternary_tlimp_t128(t128_t antecedent, t128_t consequent);
+t128_t __ternary_tquant_t128(double value, double threshold);
+t128_t __ternary_tnot_t128(t128_t a);
+t128_t __ternary_tinv_t128(t128_t a);
+t128_t __ternary_tmuladd_t128(t128_t a, t128_t b, t128_t c);
+t128_t __ternary_tround_t128(t128_t a, unsigned drop);
+t128_t __ternary_tnormalize_t128(t128_t a);
+t128_t __ternary_tbias_t128(t128_t a, int64_t bias);
+t128_t __ternary_tmux_t128(t128_t sel, t128_t neg, t128_t zero, t128_t pos);
+t128_t __ternary_tequiv_t128(t128_t a, t128_t b);
+t128_t __ternary_txor_t128(t128_t a, t128_t b);
+int __ternary_tnet_t128(t128_t a);
+#endif
 
 /* Ternary-specific comparison operations for t64 (return ternary results) */
 t64_t __ternary_cmplt_t64(t64_t a, t64_t b);

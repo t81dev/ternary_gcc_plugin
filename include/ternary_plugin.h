@@ -19,8 +19,10 @@ typedef unsigned __int128 v2t64_t;  // 2 x t64
 typedef unsigned __int128 v4t64_t;  // 4 x t64
 
 // Balanced-ternary string literals (requires runtime helpers)
+#ifndef TERNARY_PLUGIN_SKIP_BT_STR
 extern t32_t __ternary_bt_str_t32(const char *s);
 extern t64_t __ternary_bt_str_t64(const char *s);
+#endif
 #define T32_LITERAL(s) __ternary_bt_str_t32(s)
 #define T64_LITERAL(s) __ternary_bt_str_t64(s)
 #define __ternary(N) t##N##_t

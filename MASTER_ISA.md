@@ -116,6 +116,7 @@ focuses on instructions whose semantics *literally require* a three-valued persp
 - Tryte-friendly opcodes: reserve 6 trits per slot (e.g., 2 trits for vector width, 2 trits for the instruction family, 2 trits for immediates/flags). Instructions such as `TBRANCH`, `TMAJ`, and `TMULADD` can live in a single tryte with built-in width tags so the hardware decoder can dispatch without binary prefix tables.
 - Async branch support: follow Setun’s clockless transitions by treating `TBRANCH`/`TSIGNJMP` as micro-instructions that grab a condition trit and target triple simultaneously, avoiding the binary flag expansion. Documenting this early helps map the runtime helpers to future hardware that may signal targets through a branch arbiter rather than the normal program counter updates.
 - Async control handshake: model hardware such that the condition feed (ternary condition register) produces one of three ready signals, and an arbiter selects the matching target label/offset in the same cycle. `TBRANCH` should therefore expose a triple-target field plus a flag that indicates whether the jump is speculative; software helpers can mirror that by returning the chosen target value so forward progress can be verified even before hardware support arrives.
+- For a concrete tryte encoding, see `ENCODING.md`, which lays out the 6-trit fields for family/tag/flags (including how TBRANCH/TMUX/TMAJ/TNET slot into those fields) and explains how the async arbiter consumes the flag field as a readiness handshake.
 
 ## Next steps
 
@@ -124,3 +125,7 @@ focuses on instructions whose semantics *literally require* a three-valued persp
 2. Choose a canonical helper prefix (`__ternary` by default) and append the new operations to that ABI.
 3. Prototype the quantization/branch helpers in `runtime_skeleton/` so plugin tests can depend on them.
 4. Sketch hardware encodings (tryte/6-trit opcodes) once the semantics settle.
+5. Expand t128/runtime coverage (and tests) so the helper list scales beyond t64 and the TMUX/TNET paths used in the skeleton can be verified on larger registers (**Completed**).
+   - The reference runtime now defines all t128 helpers (including TMUX/TNET/TEQUIV/TXOR) via `_BitInt(256)` encode/decode helpers and exposes them through `include/ternary_runtime.h`.
+   - The runtime skeleton mirrors the same helpers so the minimal implementation delivers the ISA contracts and the TMUX/TNET demo can run across t128 lanes.
+   - Focused tests (`tests/test_logic_helpers.c`, `runtime_skeleton/test_runtime_skeleton.c`) cover the t128 helpers and `tools/check_helper_docs.py` keeps documentation in lockstep.

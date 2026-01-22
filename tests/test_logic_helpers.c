@@ -42,6 +42,15 @@ int main(void)
     expect_int("tmin_zero_pos", __ternary_tt2b_t32(__ternary_tmin_t32(zero, pos)), 0);
     expect_int("tmax_zero_pos", __ternary_tt2b_t32(__ternary_tmax_t32(zero, pos)), 1);
 
+    expect_int("tequiv_same", __ternary_tt2b_t32(__ternary_tequiv_t32(pos, pos)), 1);
+    expect_int("tequiv_unknown", __ternary_tt2b_t32(__ternary_tequiv_t32(pos, zero)), 0);
+    expect_int("tnet_simple", __ternary_tnet_t32(__ternary_tb2t_t32(2)), 2);
+    expect_int("tmux_select", __ternary_tt2b_t32(__ternary_tmux_t32(__ternary_tb2t_t32(-1),
+                                                                  __ternary_tb2t_t32(-4),
+                                                                  __ternary_tb2t_t32(0),
+                                                                  __ternary_tb2t_t32(5))),
+               -4);
+
     expect_int("tmaj_pos", __ternary_tt2b_t32(__ternary_tmaj_t32(pos, pos, neg)), 1);
     expect_int("tmaj_all_diff", __ternary_tt2b_t32(__ternary_tmaj_t32(pos, zero, neg)), 0);
 
@@ -71,6 +80,32 @@ int main(void)
     expect_int("tsignjmp_neg", __ternary_tsignjmp_t32(__ternary_tb2t_t32(-2), -1, 0, 1), -1);
     expect_int("tsignjmp_zero", __ternary_tsignjmp_t64(__ternary_tb2t_t64(0), -1, 0, 1), 0);
     expect_int("tsignjmp_pos", __ternary_tsignjmp_t64(__ternary_tb2t_t64(3), -1, 0, 1), 1);
+
+    expect_int("tequiv_t64_same", __ternary_tt2b_t64(__ternary_tequiv_t64(__ternary_tb2t_t64(1),
+                                                                      __ternary_tb2t_t64(1))), 1);
+    expect_int("txor_t64_diff", __ternary_tt2b_t64(__ternary_txor_t64(__ternary_tb2t_t64(1),
+                                                                    __ternary_tb2t_t64(-1))), 0);
+    expect_int("tnet_t64", __ternary_tnet_t64(__ternary_tb2t_t64(2)), 2);
+    expect_int("tmux_t64_select", __ternary_tt2b_t64(__ternary_tmux_t64(__ternary_tb2t_t64(0),
+                                                                      __ternary_tb2t_t64(-3),
+                                                                      __ternary_tb2t_t64(0),
+                                                                      __ternary_tb2t_t64(7))), 0);
+
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+    expect_int("t128_tequiv_same", __ternary_tt2b_t128(__ternary_tequiv_t128(__ternary_tb2t_t128(2),
+                                                                           __ternary_tb2t_t128(2))), 1);
+    expect_int("t128_tequiv_unknown", __ternary_tt2b_t128(__ternary_tequiv_t128(__ternary_tb2t_t128(1),
+                                                                              __ternary_tb2t_t128(0))), 0);
+    expect_int("t128_txor_diff", __ternary_tt2b_t128(__ternary_txor_t128(__ternary_tb2t_t128(1),
+                                                                       __ternary_tb2t_t128(0))), 1);
+    expect_int("t128_txor_same", __ternary_tt2b_t128(__ternary_txor_t128(__ternary_tb2t_t128(1),
+                                                                       __ternary_tb2t_t128(1))), -1);
+    expect_int("t128_tnet", __ternary_tnet_t128(__ternary_tb2t_t128(3)), 3);
+    expect_int("t128_tmux_pos", __ternary_tt2b_t128(__ternary_tmux_t128(__ternary_tb2t_t128(1),
+                                                                       __ternary_tb2t_t128(-2),
+                                                                       __ternary_tb2t_t128(0),
+                                                                       __ternary_tb2t_t128(4))), 4);
+#endif
 
     expect_int("tequiv_true", __ternary_tt2b_t32(__ternary_tequiv_t32(pos, pos)), 1);
     expect_int("tequiv_unknown", __ternary_tt2b_t32(__ternary_tequiv_t32(zero, pos)), 0);
@@ -139,6 +174,7 @@ int main(void)
                      __ternary_tt2b_t64(__ternary_cmplt_t64(v_lo.lo, v_hi.lo)));
     expect_tv64_lane("tv64_cmp_hi", cmp, 1,
                      __ternary_tt2b_t64(__ternary_cmplt_t64(v_lo.hi, v_hi.hi)));
+
 
     if (fail_count == 0) {
         printf("tests/test_logic_helpers: ok\n");

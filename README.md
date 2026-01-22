@@ -175,9 +175,13 @@ For testing without the plugin, the header provides C implementations of all ter
 Packed ternary types use a 2-bit encoding per trit (00 = -1, 01 = 0, 10 = +1).
 Define `TERNARY_USE_BUILTIN_TYPES` before including the header when compiling with
 `-fplugin-arg-ternary_plugin-types` to avoid typedef conflicts.
-Helper/runtime support is currently provided for t32/t64 only; t128 requires
-custom runtime implementations. The reference runtime uses 64-bit logical
-conversion helpers, so t64 correctness is limited to values that fit in int64.
+Helper/runtime support now covers t32/t64 and t128 (when `_BitInt(256)` support
+is available). The reference runtime, headers, and skeleton expose the full
+helper set—TMUX/TNET/TEQUIV/TXOR included—for t128_math paths, and the
+corresponding tests (`tests/test_logic_helpers.c`, `runtime_skeleton/test_runtime_skeleton.c`)
+exercise those helpers so their semantics are verified on wider ternary
+registers. Run `tools/check_helper_docs.py` after ABI changes to keep the helper
+list in sync.
 
 For example:
 
@@ -200,8 +204,8 @@ gcc -fplugin=./ternary_plugin.so -fplugin-arg-ternary_plugin-lower -Iinclude -c 
 
 For a minimal out-of-line runtime, use the reference implementation in `runtime/ternary_runtime.c`
 with the public header `include/ternary_runtime.h`. It implements the same packed 2-bit-trit
-semantics as the helpers (t32/t64) and is intended as a starting point for a real ISA-backed
-library. Packed helpers for t128 are not provided in this reference runtime.
+semantics as the helpers (t32/t64) and now surfaces the t128 helpers when `_BitInt(256)`
+support exists so ISA-backed runtimes can prototype on the wider register set.
 
 Example build:
 
@@ -261,6 +265,17 @@ make test CXX=g++-15 CC=gcc-15
 
 `make test` now also compiles `tests/test_literals.c` (ensuring literal helpers + promotions compile) and `test_ternary.c` with `-fplugin-arg-ternary_plugin-dump-gimple` so Phase 3 coverage exercises the dump/trace flags.
 
+### Extended helper ABI
+
+In addition to the core helper ABI described in `SPECIFICATION.md`, the roadmap now exposes the ternary-only helpers used by the TMUX/TNET/TNN demo and the runtime/reference implementations:
+
+- `__ternary_tmux_t32` / `__ternary_tmux_t64` / `__ternary_tmux_t128`
+- `__ternary_tequiv_t32` / `__ternary_tequiv_t64` / `__ternary_tequiv_t128`
+- `__ternary_txor_t32` / `__ternary_txor_t64` / `__ternary_txor_t128`
+- `__ternary_tnet_t32` / `__ternary_tnet_t64` / `__ternary_tnet_t128`
+
+These helpers are exercised by the runtime skeleton demo (`runtime_skeleton/run_tnn_demo.sh`), which now builds and runs a tiny ternary neural network pipeline across t32/t64/t128 helper implementations and TMUX-driven routing logic.
+
 ## Description
 
 This plugin analyzes ternary conditional expressions in the code and can optionally
@@ -304,7 +319,27 @@ For helpers that literally need three-valued semantics (TMIN/TMAX, TIMPL/TLIMP,
 TMAJ, TQUANT, and the TNOT/TINV aliases), see `MASTER_ISA.md`. It documents how
 these instructions propagate “unknown” trits, when to use TINV as an inference
 alias, and the extended control-flow helpers (TBRANCH/TSIGNJMP) you can expose
-through `__ternary_*` before hardware encodings are sketched.
+through `__ternary_*` before hardware encodings are sketched (see `ENCODING.md`
+for the tryte field layout mentioned there).
+
+### Helper symbol inventory
+
+```
+__ternary_tbias_t32 __ternary_tbias_t64 __ternary_tbias_t128 __ternary_tbranch __ternary_tequiv_t32
+__ternary_tequiv_t64 __ternary_tequiv_t128 __ternary_tinv_t32 __ternary_tinv_t64 __ternary_tinv_t128
+__ternary_tlimp_t32 __ternary_tlimp_t64 __ternary_tlimp_t128 __ternary_tlimp_tv32 __ternary_tmaj_t32
+__ternary_tmaj_t64 __ternary_tmaj_t128 __ternary_tmaj_tv32 __ternary_tmax_t32 __ternary_tmax_t64
+__ternary_tmax_t128 __ternary_tmax_tv32 __ternary_tmin_t32 __ternary_tmin_t64 __ternary_tmin_t128
+__ternary_tmin_tv32 __ternary_tmuladd_t32 __ternary_tmuladd_t64 __ternary_tmuladd_t128 __ternary_tmux_t32
+__ternary_tmux_t64 __ternary_tmux_t128 __ternary_tnet_t32 __ternary_tnet_t64 __ternary_tnet_t128
+__ternary_tnormalize_t32 __ternary_tnormalize_t64 __ternary_tnormalize_t128 __ternary_tnot_t32
+__ternary_tnot_t64 __ternary_tnot_t128 __ternary_tquant_t32 __ternary_tquant_t64 __ternary_tquant_t128
+__ternary_tquant_tv32 __ternary_tround_t32 __ternary_tround_t64 __ternary_tround_t128 __ternary_tround_tv32
+__ternary_tsignjmp_t32 __ternary_tsignjmp_t64 __ternary_txor_t32 __ternary_txor_t64 __ternary_txor_t128
+```
+The expanded helper list now also covers ternary equivalence/XOR (`TEQUIV`/`TXOR`),
+TMUX-style data selectors, and the net-trit sum helper (`TNET`), so the roadmap,
+runtime, and docs all agree on the full ternary-only ISA surface.
 
 ### Control Flow Operations (brt/brf) - PLANNED
 - `brt Rc, label`: branch if Rc != 0 (ternary true)

@@ -10,6 +10,9 @@ extern "C" {
 #ifndef TERNARY_USE_BUILTIN_TYPES
 typedef uint64_t t32_t;           /* 32 trits -> 64 bits */
 typedef unsigned __int128 t64_t;  /* 64 trits -> 128 bits */
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+typedef unsigned _BitInt(256) t128_t; /* 128 trits -> 256 bits */
+#endif
 #endif
 
 #ifndef TERNARY_COND_T
@@ -71,6 +74,10 @@ typedef int64_t ternary_cond_t;
     t32_t TERNARY_RUNTIME_NAME(prefix, tround_t32)(t32_t a, unsigned drop); \
     t32_t TERNARY_RUNTIME_NAME(prefix, tnormalize_t32)(t32_t a); \
     t32_t TERNARY_RUNTIME_NAME(prefix, tbias_t32)(t32_t a, int64_t bias); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tmux_t32)(t32_t sel, t32_t neg, t32_t zero, t32_t pos); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tequiv_t32)(t32_t a, t32_t b); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, txor_t32)(t32_t a, t32_t b); \
+    int TERNARY_RUNTIME_NAME(prefix, tnet_t32)(t32_t a); \
     t32_t TERNARY_RUNTIME_NAME(prefix, shl_t32)(t32_t a, int shift); \
     t32_t TERNARY_RUNTIME_NAME(prefix, shr_t32)(t32_t a, int shift); \
     t32_t TERNARY_RUNTIME_NAME(prefix, rol_t32)(t32_t a, int shift); \
@@ -101,6 +108,10 @@ typedef int64_t ternary_cond_t;
     t64_t TERNARY_RUNTIME_NAME(prefix, tround_t64)(t64_t a, unsigned drop); \
     t64_t TERNARY_RUNTIME_NAME(prefix, tnormalize_t64)(t64_t a); \
     t64_t TERNARY_RUNTIME_NAME(prefix, tbias_t64)(t64_t a, int64_t bias); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tmux_t64)(t64_t sel, t64_t neg, t64_t zero, t64_t pos); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tequiv_t64)(t64_t a, t64_t b); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, txor_t64)(t64_t a, t64_t b); \
+    int TERNARY_RUNTIME_NAME(prefix, tnet_t64)(t64_t a); \
     t64_t TERNARY_RUNTIME_NAME(prefix, shl_t64)(t64_t a, int shift); \
     t64_t TERNARY_RUNTIME_NAME(prefix, shr_t64)(t64_t a, int shift); \
     t64_t TERNARY_RUNTIME_NAME(prefix, rol_t64)(t64_t a, int shift); \
@@ -108,13 +119,38 @@ typedef int64_t ternary_cond_t;
     t64_t TERNARY_RUNTIME_NAME(prefix, select_t64)(TERNARY_COND_T cond, t64_t t, t64_t f); \
     t64_t TERNARY_RUNTIME_NAME(prefix, tb2t_t64)(int64_t v); \
     int64_t TERNARY_RUNTIME_NAME(prefix, tt2b_t64)(t64_t v); \
-    int TERNARY_RUNTIME_NAME(prefix, cmp_t64)(t64_t a, t64_t b);
+int TERNARY_RUNTIME_NAME(prefix, cmp_t64)(t64_t a, t64_t b);
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+#define TERNARY_RUNTIME_DECLARE_T128(prefix) \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tmin_t128)(t128_t a, t128_t b); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tmax_t128)(t128_t a, t128_t b); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tmaj_t128)(t128_t a, t128_t b, t128_t c); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tlimp_t128)(t128_t antecedent, t128_t consequent); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tquant_t128)(double value, double threshold); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tnot_t128)(t128_t a); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tinv_t128)(t128_t a); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tmuladd_t128)(t128_t a, t128_t b, t128_t c); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tround_t128)(t128_t a, unsigned drop); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tnormalize_t128)(t128_t a); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tbias_t128)(t128_t a, int64_t bias); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tmux_t128)(t128_t sel, t128_t neg, t128_t zero, t128_t pos); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tequiv_t128)(t128_t a, t128_t b); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, txor_t128)(t128_t a, t128_t b); \
+    int TERNARY_RUNTIME_NAME(prefix, tnet_t128)(t128_t a); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, select_t128)(TERNARY_COND_T cond, t128_t t, t128_t f); \
+    t128_t TERNARY_RUNTIME_NAME(prefix, tb2t_t128)(int64_t v); \
+    int64_t TERNARY_RUNTIME_NAME(prefix, tt2b_t128)(t128_t v); \
+    int TERNARY_RUNTIME_NAME(prefix, cmp_t128)(t128_t a, t128_t b);
+#endif
 
 /* Scalar helpers (non-packed). */
 TERNARY_RUNTIME_DECLARE_SCALAR(TERNARY_RUNTIME_PREFIX)
 
 TERNARY_RUNTIME_DECLARE_T32(TERNARY_RUNTIME_PREFIX)
 TERNARY_RUNTIME_DECLARE_T64(TERNARY_RUNTIME_PREFIX)
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+TERNARY_RUNTIME_DECLARE_T128(TERNARY_RUNTIME_PREFIX)
+#endif
 
 #define TERNARY_RUNTIME_DECLARE_BRANCH(prefix) \
     int TERNARY_RUNTIME_NAME(prefix, tbranch)(TERNARY_COND_T cond, int neg_target, int zero_target, int pos_target); \
@@ -127,6 +163,9 @@ TERNARY_RUNTIME_DECLARE_BRANCH(TERNARY_RUNTIME_PREFIX)
 TERNARY_RUNTIME_DECLARE_SCALAR(__ternary_)
 TERNARY_RUNTIME_DECLARE_T32(__ternary_)
 TERNARY_RUNTIME_DECLARE_T64(__ternary_)
+#if defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 256 && !defined(__cplusplus)
+TERNARY_RUNTIME_DECLARE_T128(__ternary_)
+#endif
 TERNARY_RUNTIME_DECLARE_BRANCH(__ternary_)
 #endif
 
