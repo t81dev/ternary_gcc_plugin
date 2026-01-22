@@ -198,6 +198,11 @@ __ternary_tb2t_t32 __ternary_tb2t_t64 __ternary_tb2t_t128 __ternary_tt2b_t32 __t
 
 This inventory is the contract: any runtime or hardware backend must implement these symbols with the semantics described in `SPECIFICATION.md`.
 
+## AI-focused examples
+
+Progressively richer examples help a new user (or AI agent) understand how ternary source maps to the helper ABI. See [`docs/examples.md`](docs/examples.md) for a 10-step guided suite that links code snippets, plugin flags, and emitted helpers from simple selects up through TMUX/TNET routing and coverage diagnostics.
+Run `tools/quickstart.sh` to compile every example with the plugin and surface the Phase 3/4 diagnostics log automatically.
+
 ## Control Flow
 
 Lowering focuses on making ternary control dependencies explicit in GIMPLE; actual binary branching encodings
@@ -234,4 +239,3 @@ See `examples/` for demo programs covering basic usage, calculator-style logic, 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, coding standards, and how to run tests locally.
-

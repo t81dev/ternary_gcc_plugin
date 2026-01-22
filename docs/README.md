@@ -7,3 +7,4 @@ The repository README now lives at [`../README.md`](../README.md) so that visito
 - [docs/SPECIFICATION.md](SPECIFICATION.md)
 - [docs/MASTER_ISA.md](MASTER_ISA.md)
 - [docs/ENCODING.md](ENCODING.md)
+- [`docs/examples.md`](examples.md) (guided sample programs + instructions to run `tools/quickstart.sh`)
