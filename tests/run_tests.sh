@@ -47,4 +47,11 @@ $GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-conv -I../include -c ../test_t
 echo "Testing types..."
 $GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-types -I../include -c ../test_ternary.c -o test_types.o
 
+echo "Testing literals/promotion macros..."
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-types -I../include -c test_literals.c -o test_literals.o
+
+echo "Testing gimple/dump features..."
+$GCC -fplugin=$PLUGIN -fplugin-arg-ternary_plugin-lower \
+     -fplugin-arg-ternary_plugin-dump-gimple -I../include -c ../test_ternary.c -o test_dump.o
+
 echo "All plugin tests compiled successfully."

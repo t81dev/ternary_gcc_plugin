@@ -4,6 +4,12 @@
 /* Helper functions for a balanced-ternary ISA.
  * These are example implementations using placeholder ISA instructions (tsel/tadd/tmul/tnot).
  * Adjust the assembly to match your actual ISA and calling convention.
+ *
+ * The Setun ISA and modern REBEL-6 work inspired the helpers below. When possible prefer
+ * the ternary-only ops listed in MASTER_ISA.md (three-valued implication, majority voting,
+ * TMIN/TMAX, TQUANT, TMULADD, and symmetric rounding) instead of emulating them with
+ * binary sequences. These helpers stay compatible with the GCC plugin ABI and are intended
+ * to survive into hardware-friendly implementations.
  */
 
 #include <stdint.h>

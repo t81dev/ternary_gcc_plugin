@@ -60,6 +60,17 @@ typedef int64_t ternary_cond_t;
     t32_t TERNARY_RUNTIME_NAME(prefix, and_t32)(t32_t a, t32_t b); \
     t32_t TERNARY_RUNTIME_NAME(prefix, or_t32)(t32_t a, t32_t b); \
     t32_t TERNARY_RUNTIME_NAME(prefix, xor_t32)(t32_t a, t32_t b); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tmin_t32)(t32_t a, t32_t b); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tmax_t32)(t32_t a, t32_t b); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tmaj_t32)(t32_t a, t32_t b, t32_t c); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tlimp_t32)(t32_t antecedent, t32_t consequent); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tquant_t32)(float value, float threshold); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tnot_t32)(t32_t a); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tinv_t32)(t32_t a); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tmuladd_t32)(t32_t a, t32_t b, t32_t c); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tround_t32)(t32_t a, unsigned drop); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tnormalize_t32)(t32_t a); \
+    t32_t TERNARY_RUNTIME_NAME(prefix, tbias_t32)(t32_t a, int64_t bias); \
     t32_t TERNARY_RUNTIME_NAME(prefix, shl_t32)(t32_t a, int shift); \
     t32_t TERNARY_RUNTIME_NAME(prefix, shr_t32)(t32_t a, int shift); \
     t32_t TERNARY_RUNTIME_NAME(prefix, rol_t32)(t32_t a, int shift); \
@@ -79,6 +90,17 @@ typedef int64_t ternary_cond_t;
     t64_t TERNARY_RUNTIME_NAME(prefix, and_t64)(t64_t a, t64_t b); \
     t64_t TERNARY_RUNTIME_NAME(prefix, or_t64)(t64_t a, t64_t b); \
     t64_t TERNARY_RUNTIME_NAME(prefix, xor_t64)(t64_t a, t64_t b); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tmin_t64)(t64_t a, t64_t b); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tmax_t64)(t64_t a, t64_t b); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tmaj_t64)(t64_t a, t64_t b, t64_t c); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tlimp_t64)(t64_t antecedent, t64_t consequent); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tquant_t64)(double value, double threshold); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tnot_t64)(t64_t a); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tinv_t64)(t64_t a); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tmuladd_t64)(t64_t a, t64_t b, t64_t c); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tround_t64)(t64_t a, unsigned drop); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tnormalize_t64)(t64_t a); \
+    t64_t TERNARY_RUNTIME_NAME(prefix, tbias_t64)(t64_t a, int64_t bias); \
     t64_t TERNARY_RUNTIME_NAME(prefix, shl_t64)(t64_t a, int shift); \
     t64_t TERNARY_RUNTIME_NAME(prefix, shr_t64)(t64_t a, int shift); \
     t64_t TERNARY_RUNTIME_NAME(prefix, rol_t64)(t64_t a, int shift); \
@@ -91,19 +113,29 @@ typedef int64_t ternary_cond_t;
 /* Scalar helpers (non-packed). */
 TERNARY_RUNTIME_DECLARE_SCALAR(TERNARY_RUNTIME_PREFIX)
 
-/* Minimal helper set for plugin lowering. */
 TERNARY_RUNTIME_DECLARE_T32(TERNARY_RUNTIME_PREFIX)
 TERNARY_RUNTIME_DECLARE_T64(TERNARY_RUNTIME_PREFIX)
+
+#define TERNARY_RUNTIME_DECLARE_BRANCH(prefix) \
+    int TERNARY_RUNTIME_NAME(prefix, tbranch)(TERNARY_COND_T cond, int neg_target, int zero_target, int pos_target); \
+    int TERNARY_RUNTIME_NAME(prefix, tsignjmp_t32)(t32_t reg, int neg_target, int zero_target, int pos_target); \
+    int TERNARY_RUNTIME_NAME(prefix, tsignjmp_t64)(t64_t reg, int neg_target, int zero_target, int pos_target);
+
+TERNARY_RUNTIME_DECLARE_BRANCH(TERNARY_RUNTIME_PREFIX)
 
 #ifndef TERNARY_RUNTIME_NO_COMPAT
 TERNARY_RUNTIME_DECLARE_SCALAR(__ternary_)
 TERNARY_RUNTIME_DECLARE_T32(__ternary_)
 TERNARY_RUNTIME_DECLARE_T64(__ternary_)
+TERNARY_RUNTIME_DECLARE_BRANCH(__ternary_)
 #endif
 
 #undef TERNARY_RUNTIME_DECLARE_SCALAR
 #undef TERNARY_RUNTIME_DECLARE_T32
 #undef TERNARY_RUNTIME_DECLARE_T64
+
+/* Need to ensure branch macros cleanup */
+#undef TERNARY_RUNTIME_DECLARE_BRANCH
 
 #ifdef __cplusplus
 }

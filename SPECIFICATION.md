@@ -162,6 +162,8 @@ intended to be exposed via the GCC plugin and helper ABI.
 - tdiv: ternary divide (division by zero returns 0)
 - tmod: ternary modulo (division by zero returns 0)
 - tneg: unary negate
+- tmuladd: ternary multiply-add with symmetric rounding (A×B + C)
+- tround: drop least-significant trits with symmetric rounding bias
 - tabs: absolute value (optional helper if not encoded in hardware)
 
 ### Ternary Comparison and Condition Ops
@@ -183,6 +185,7 @@ intended to be exposed via the GCC plugin and helper ABI.
 - tnorm: normalize packed representation to canonical form
 - tb2t: binary container to ternary logical value
 - tt2b: ternary logical value to binary container
+- tquant: quantize binary/float inputs to nearest trit values (useful for ternary-quantized neural nets)
 
 ## Ternary Base ISA v0
 
@@ -250,6 +253,7 @@ with results reduced to the tN range using balanced ternary representation.
 - tnot.tN Td, Ta: Td := tritwise inversion (-1 <-> +1, 0 -> 0)
 - tand.tN Td, Ta, Tb: Td := min(Ta, Tb) per-trit
 - tor.tN  Td, Ta, Tb: Td := max(Ta, Tb) per-trit
+- timpl.tN Td, Ta, Tb: Kleene implication per trit (see `MASTER_ISA.md` for the truth table)
 - txor.tN Td, Ta, Tb: Td := ternary XOR (ISA-defined, must be stable)
 
 #### Compare
@@ -304,9 +308,31 @@ Branches use ternary conditions:
 - brt cond, label: branch if cond != 0
 - brf cond, label: branch if cond == 0
 
+Ternary-aware helpers like `tbranch` and `tsignjmp` (see `MASTER_ISA.md`) allow
+three-way control-flow selection or sign-directed jumps without chaining binary
+flags, matching Setun’s triple-transition model.
+
 Comparisons produce ternary results and are used directly by branches.
 
 ## ABI and Calling Convention
+
+### Storage layout
+
+- Balanced-ternary values are packed into binary containers with a 2-bit per trit encoding
+  (00 = -1, 01 = 0, 10 = +1, 11 = reserved), and bit patterns must survive loads/stores/calls.
+- The canonical containers map as follows: `t32_t` → 64-bit, `t64_t` → 128-bit, and `t128_t` →
+  256-bit storage. Vector helpers extend this scheme (e.g., `tv32_t` is 128 bits for 2 × t32_t,
+  `tv64_t` is 256 bits for 2 × t64_t).
+- The helper/`runtime/ternary_runtime.h` headers expose the same layout so that software and
+  hardware implementations remain bit-for-bit compatible.
+
+### Condition type
+
+- The plugin lowers every condition expression to `ternary_cond_t` before calling helpers.
+- `ternary_cond_t` defaults to `int64_t` (per `ternary_helpers.h` and `ternary_runtime.h`) but
+  may be overridden by consumer code; non-zero values mean true and zero means false.
+- Packed ternary comparisons are decoded through `tt2b` before selective operations consult
+  this ABI condition type.
 
 ### Registers
 
@@ -314,50 +340,49 @@ Registers are ternary-width, but stored in binary containers per ABI.
 
 ### Argument Passing
 
-- Ternary integers passed in ternary registers if available, otherwise in
-  binary containers in integer registers/stack slots.
-- Floating point uses existing FP registers (IEEE).
+- Ternary integers are passed in ternary registers when the backend supports them, otherwise
+  they travel in binary containers occupying the canonical storage width (e.g., `t64_t` takes
+  128 bits in a register or stack slot).
+- Floating point arguments reuse the existing IEEE FP register conventions.
 
 ### Return Values
 
-Return ternary integers in designated ternary register or integer container register.
+Return ternary integers in the designated ternary register or the integer container register
+that corresponds to the storage width.
 
 ### Varargs
 
-Varargs are passed using binary containers. The callee interprets the container based
-on the promoted ternary type. The helper headers provide TERNARY_VA_ARG_T6/T12/T24
-macros to decode promotions for packed ternary types.
+Varargs are passed using binary containers. The callee interprets the container based on the
+promoted ternary type. The helper headers provide `TERNARY_VA_ARG_T32`/`TERNARY_VA_ARG_T64`
+macros (formerly referenced as T6/T12/T24) to decode promotions for packed ternary types.
 
 ## Toolchain Contract
 
 ### Builtins
 
-- __builtin_ternary_select(cond, t, f)
-- __builtin_ternary_add(a, b)
-- __builtin_ternary_sub(a, b)
-- __builtin_ternary_mul(a, b)
-- __builtin_ternary_div(a, b)
-- __builtin_ternary_mod(a, b)
-- __builtin_ternary_neg(a)
-- __builtin_ternary_not(a)
-- __builtin_ternary_and(a, b)
-- __builtin_ternary_or(a, b)
-- __builtin_ternary_xor(a, b)
-- __builtin_ternary_cmp(a, b)
-- __builtin_ternary_eq(a, b) -> int
-- __builtin_ternary_ne(a, b) -> int
-- __builtin_ternary_lt(a, b) -> int
-- __builtin_ternary_le(a, b) -> int
-- __builtin_ternary_gt(a, b) -> int
-- __builtin_ternary_ge(a, b) -> int
-- __builtin_ternary_shl(a, b)
-- __builtin_ternary_shr(a, b)
-- __builtin_ternary_rol(a, b)
-- __builtin_ternary_ror(a, b)
-- __builtin_ternary_tb2t(a)
-- __builtin_ternary_tt2b(a)
-- __builtin_ternary_t2f(a)
-- __builtin_ternary_f2t(a)
+The GCC plugin defines builtin functions that map directly to the helper ABI. They are grouped
+into the following categories (see `include/ternary.h`):
+
+- **Select and arithmetic**: `__builtin_ternary_select`, `__builtin_ternary_add`,
+  `__builtin_ternary_sub`, `__builtin_ternary_mul`, `__builtin_ternary_div`,
+  `__builtin_ternary_mod`, `__builtin_ternary_neg`.
+- **Logic**: `__builtin_ternary_not`, `__builtin_ternary_and`, `__builtin_ternary_or`,
+  `__builtin_ternary_xor`.
+- **Integer comparisons (binary results)**: `__builtin_ternary_cmp`,
+  `__builtin_ternary_eq`, `__builtin_ternary_ne`, `__builtin_ternary_lt`,
+  `__builtin_ternary_le`, `__builtin_ternary_gt`, `__builtin_ternary_ge`.
+- **Shift/rotate**: `__builtin_ternary_shl`, `__builtin_ternary_shr`, `__builtin_ternary_rol`,
+  `__builtin_ternary_ror`.
+- **Conversions**: `__builtin_ternary_tb2t`, `__builtin_ternary_tt2b`, `__builtin_ternary_t2f`,
+  `__builtin_ternary_f2t`.
+- **Ternary comparisons (ternary results)**: `__builtin_ternary_cmplt`, `__builtin_ternary_cmpeq`,
+  `__builtin_ternary_cmpgt`, `__builtin_ternary_cmpneq`, and their `_t64` variants.
+- **Memory helpers**: `__builtin_ternary_load_t32`, `__builtin_ternary_store_t32`,
+  `__builtin_ternary_load_t64`, `__builtin_ternary_store_t64`.
+- **Vector SIMD helpers**: `__builtin_ternary_add_tv32`, `__builtin_ternary_sub_tv32`,
+  `__builtin_ternary_mul_tv32`, `__builtin_ternary_and_tv32`, `__builtin_ternary_or_tv32`,
+  `__builtin_ternary_xor_tv32`, `__builtin_ternary_not_tv32`, `__builtin_ternary_cmp_tv32`,
+  plus the `tv64` equivalents.
 
 ### Custom Types
 
@@ -367,40 +392,52 @@ trit storage (precision = trit_count * 2).
 
 ### Helper ABI
 
-Helper functions implement ISA-visible operations in C:
+Helper functions implement the ISA-visible operations and expose the storage ABI to
+language front ends. Every helper name is mirrored in `include/ternary_runtime.h` so
+helper implementations can be shared between plugin tests and downstream runtimes.
 
-- __ternary_select_[i|u]N(cond_t, true_val, false_val)
-- __ternary_select_f32(cond_t, true_val, false_val)
-- __ternary_select_f64(cond_t, true_val, false_val)
-- __ternary_add(a, b)
-- __ternary_sub(a, b)
-- __ternary_mul(a, b)
-- __ternary_div(a, b)
-- __ternary_mod(a, b)
-- __ternary_neg(a)
-- __ternary_not(a)
-- __ternary_and(a, b)
-- __ternary_or(a, b)
-- __ternary_xor(a, b)
-- __ternary_cmp(a, b)
-- __ternary_eq(a, b) -> int
-- __ternary_ne(a, b) -> int
-- __ternary_lt(a, b) -> int
-- __ternary_le(a, b) -> int
-- __ternary_gt(a, b) -> int
-- __ternary_ge(a, b) -> int
-- __ternary_shl(a, b)
-- __ternary_shr(a, b)
-- __ternary_rol(a, b)
-- __ternary_ror(a, b)
-- __ternary_tb2t(a)
-- __ternary_tt2b(a)
-- __ternary_t2f32(a) / __ternary_t2f64(a)
-- __ternary_f2t32(a) / __ternary_f2t64(a)
+- **Select helpers** (integers, unsigned, floats, ternary scalars): `__ternary_select_i8`,
+  `__ternary_select_i16`, `__ternary_select_i32`, `__ternary_select_i64`, `__ternary_select_u8`,
+  `__ternary_select_u16`, `__ternary_select_u32`, `__ternary_select_u64`, `__ternary_select_f32`,
+  `__ternary_select_f64`, `__ternary_select_t32`, `__ternary_select_t64`.
+- **Integer arithmetic/logical helpers**: `__ternary_add`, `__ternary_sub`, `__ternary_mul`,
+  `__ternary_div`, `__ternary_mod`, `__ternary_neg`, `__ternary_not`, `__ternary_and`,
+  `__ternary_or`, `__ternary_xor`.
+- **Integer comparisons (binary results)**: `__ternary_cmp`, `__ternary_cmp_t32`, `__ternary_cmp_t64`,
+  `__ternary_eq`, `__ternary_ne`, `__ternary_lt`, `__ternary_le`, `__ternary_gt`,
+  `__ternary_ge`.
+- **Shift/rotate helpers**: `__ternary_shl`, `__ternary_shr`, `__ternary_rol`, `__ternary_ror`.
+- **Packed ternary scalar helpers** (t32/t64): `__ternary_add_t32`, `__ternary_add_t64`,
+  `__ternary_mul_t32`, `__ternary_mul_t64`, `__ternary_not_t32`, `__ternary_not_t64`,
+  `__ternary_sub_t32`, `__ternary_sub_t64`, `__ternary_div_t32`, `__ternary_div_t64`,
+  `__ternary_mod_t32`, `__ternary_mod_t64`, `__ternary_neg_t32`, `__ternary_neg_t64`,
+  `__ternary_and_t32`, `__ternary_and_t64`, `__ternary_or_t32`, `__ternary_or_t64`,
+  `__ternary_xor_t32`, `__ternary_xor_t64`, `__ternary_shl_t32`, `__ternary_shl_t64`,
+  `__ternary_shr_t32`, `__ternary_shr_t64`, `__ternary_rol_t32`, `__ternary_rol_t64`,
+  `__ternary_ror_t32`, `__ternary_ror_t64`.
+- **Packed ternary comparisons (ternary results)**: `__ternary_cmplt_t32`, `__ternary_cmplt_t64`,
+  `__ternary_cmpeq_t32`, `__ternary_cmpeq_t64`, `__ternary_cmpgt_t32`, `__ternary_cmpgt_t64`,
+  `__ternary_cmpneq_t32`, `__ternary_cmpneq_t64`.
+- **Conversion helpers**: `__ternary_tb2t_t32`, `__ternary_tb2t_t64`, `__ternary_tt2b_t32`,
+  `__ternary_tt2b_t64`, `__ternary_t2f32_t32`, `__ternary_t2f32_t64`, `__ternary_t2f64_t32`,
+  `__ternary_t2f64_t64`, `__ternary_f2t32_t32`, `__ternary_f2t32_t64`, `__ternary_f2t64_t32`,
+  `__ternary_f2t64_t64`.
+- **Memory helpers**: `__ternary_load_t32`, `__ternary_store_t32`, `__ternary_load_t64`,
+  `__ternary_store_t64`.
+- **Vector SIMD helpers**: `__ternary_add_tv32`, `__ternary_sub_tv32`, `__ternary_mul_tv32`,
+  `__ternary_and_tv32`, `__ternary_or_tv32`, `__ternary_xor_tv32`, `__ternary_not_tv32`,
+  `__ternary_cmp_tv32`, `__ternary_add_tv64`, `__ternary_sub_tv64`, `__ternary_mul_tv64`,
+  `__ternary_and_tv64`, `__ternary_or_tv64`, `__ternary_xor_tv64`, `__ternary_not_tv64`,
+  `__ternary_cmp_tv64`.
+- **Literal parsing helpers**: `__ternary_bt_str_t32`, `__ternary_bt_str_t64`.
 
-cond_t is ternary_cond_t (default: int64_t). The plugin lowers conditions to
-ternary_cond_t before calling helpers. The reference helper header uses a packed
-2-bit trit encoding (00 = -1, 01 = 0, 10 = +1).
+Conversion helpers that return floating point scalars are still named `__ternary_t2f32`,
+`__ternary_t2f64`, `__ternary_f2t32`, `__ternary_f2t64` for the standard `t32_t`/`t64_t`
+interpretation.
+
+cond_t is `ternary_cond_t` (default: `int64_t`). The plugin lowers conditions to
+`ternary_cond_t` before calling helpers, and the reference helper header uses the same
+packed 2-bit trit encoding (00 = -1, 01 = 0, 10 = +1).
 
 ### GCC Plugin Behavior
 
@@ -440,6 +477,7 @@ ternary_cond_t before calling helpers. The reference helper header uses a packed
 
 ## Future Extensions
 
+- Track the **Master ISA Roadmap** (`MASTER_ISA.md`) so the new ternary-only helpers (TMIN/TMAX/TIMPL/TMAJ, etc.) are reflected inside this spec and the helper ABI.
 - Native ternary floating point formats.
 - Vector/SIMD ternary operations.
 - Full ternary logic instruction set (tand, tor, txor).

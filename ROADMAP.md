@@ -81,10 +81,13 @@ Deliverables:
 
 - Document supported platform/compiler versions and current status.
 - Add ABI validation checks in CI (symbol presence or hash).
+- Ensure the documented helper ABI (`SPECIFICATION.md`/README) stays aligned with the headers
+  (`include/ternary_runtime.h`, `include/ternary_helpers.h`), ideally via a CI regression.
 
 Deliverables:
 - Compatibility matrix in `README.md`.
 - ABI validation step in CI.
+- Regression/check that the helper ABI list matches the headers/docs.
 
 ## Phase 8: Optional Hardware Backend
 

@@ -165,6 +165,12 @@ assembly to match your ISA. `TERNARY_COND_T` defines the condition type used by 
 and is fixed to `ternary_cond_t` (default: `int64_t`). The plugin lowers conditions to
 `ternary_cond_t` before helper calls.
 
+See `SPECIFICATION.md` for the current ABI and helper list grouped by category; keep it in sync
+with `include/ternary_runtime.h` (and the helper header) so documentation, tests, and the plugin
+Lowering stay aligned.
+Run `make check-helper-docs` (or `python3 tools/check_helper_docs.py`) whenever the helper ABI list
+or headers change to keep the helper documentation in lockstep.
+
 For testing without the plugin, the header provides C implementations of all ternary operations.
 Packed ternary types use a 2-bit encoding per trit (00 = -1, 01 = 0, 10 = +1).
 Define `TERNARY_USE_BUILTIN_TYPES` before including the header when compiling with
@@ -253,6 +259,8 @@ On macOS, run:
 make test CXX=g++-15 CC=gcc-15
 ```
 
+`make test` now also compiles `tests/test_literals.c` (ensuring literal helpers + promotions compile) and `test_ternary.c` with `-fplugin-arg-ternary_plugin-dump-gimple` so Phase 3 coverage exercises the dump/trace flags.
+
 ## Description
 
 This plugin analyzes ternary conditional expressions in the code and can optionally
@@ -291,6 +299,12 @@ The ternary vector operations provide a foundation for SIMD acceleration:
 - Balanced ternary enables simpler arithmetic than two's complement
 - Potential for higher computational density in AI/ML workloads
 - Reduced carry propagation compared to binary arithmetic
+
+For helpers that literally need three-valued semantics (TMIN/TMAX, TIMPL/TLIMP,
+TMAJ, TQUANT, and the TNOT/TINV aliases), see `MASTER_ISA.md`. It documents how
+these instructions propagate “unknown” trits, when to use TINV as an inference
+alias, and the extended control-flow helpers (TBRANCH/TSIGNJMP) you can expose
+through `__ternary_*` before hardware encodings are sketched.
 
 ### Control Flow Operations (brt/brf) - PLANNED
 - `brt Rc, label`: branch if Rc != 0 (ternary true)

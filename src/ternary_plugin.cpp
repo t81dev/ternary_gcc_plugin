@@ -16,7 +16,9 @@
 #include <diagnostic-core.h>
 #include <dumpfile.h>
 #include <tree-core.h>
+#include <poly-int-types.h>
 #include <langhooks.h>
+#include <is-a.h>
 
 // Undefine conflicting macros from safe-ctype.h
 #undef toupper
@@ -229,7 +231,13 @@ static bool get_ternary_vector_type_trits(tree type, unsigned *element_trit_coun
             return false;
 
         // Check that it's a vector of 2 elements
-        if (TYPE_VECTOR_SUBPARTS(type) != 2)
+        poly_uint64 subparts = TYPE_VECTOR_SUBPARTS(type);
+        if (subparts.coeffs[0] != 2)
+            return false;
+#if NUM_POLY_INT_COEFFS == 2
+        if (subparts.coeffs[1] != 0)
+            return false;
+#endif
             return false;
 
         ternary_vector_type_uids.emplace(uid, matched_trits);
@@ -241,6 +249,19 @@ static bool get_ternary_vector_type_trits(tree type, unsigned *element_trit_coun
     if (element_trit_count)
         *element_trit_count = it->second;
     return true;
+}
+
+static bool ternary_pack_constant(tree value, tree type, tree *out);
+static bool ternary_unpack_constant(tree value, tree type, int64_t *out);
+
+static inline bool is_cond_stmt(const gimple *stmt)
+{
+    return stmt && stmt->code == GIMPLE_COND;
+}
+
+static inline bool is_return_stmt(const gimple *stmt)
+{
+    return stmt && stmt->code == GIMPLE_RETURN;
 }
 
 static tree lower_cond_expr_tree(tree expr, gimple_stmt_iterator *gsi)
@@ -826,8 +847,8 @@ public:
             for (gimple_stmt_iterator gsi = gsi_start_bb(bb); !gsi_end_p(gsi); gsi_next(&gsi))
             {
                 gimple *stmt = gsi_stmt(gsi);
-                if (!is_gimple_assign(stmt) && !is_gimple_call(stmt) && !is_gimple_cond(stmt) &&
-                    !is_gimple_return(stmt))
+                if (!is_gimple_assign(stmt) && !is_gimple_call(stmt) && !is_cond_stmt(stmt) &&
+                    !is_return_stmt(stmt))
                     continue;
 
                 if (is_gimple_assign(stmt) && gimple_assign_rhs_code(stmt) == COND_EXPR)
@@ -1650,6 +1671,8 @@ skip_cond_simplify:
                 // Lower memory operations
                 if (is_gimple_call(stmt) && opt_mem)
                 {
+                    tree lhs = gimple_call_lhs(stmt);
+                    tree lhs_type = lhs ? TREE_TYPE(lhs) : NULL_TREE;
                     const char *name = IDENTIFIER_POINTER(DECL_NAME(gimple_call_fndecl(stmt)));
                     if (!strcmp(name, "__builtin_ternary_load_t32"))
                     {
@@ -1724,8 +1747,9 @@ skip_cond_simplify:
                     }
                 }
 
-                if (is_gimple_cond(stmt) && opt_lower)
+                if (is_cond_stmt(stmt) && opt_lower)
                 {
+                    gcond *cond_stmt = GIMPLE_CHECK2<gcond *>(stmt);
                     tree lhs = gimple_cond_lhs(stmt);
                     tree rhs = gimple_cond_rhs(stmt);
                     enum tree_code code = gimple_cond_code(stmt);
@@ -1734,8 +1758,8 @@ skip_cond_simplify:
                         tree cmp_tmp = build_cmp_call(lhs, rhs, &gsi);
                         if (cmp_tmp) {
                             tree zero = build_int_cst(integer_type_node, 0);
-                            gimple_cond_set_lhs(stmt, cmp_tmp);
-                            gimple_cond_set_rhs(stmt, zero);
+                            gimple_cond_set_lhs(cond_stmt, cmp_tmp);
+                            gimple_cond_set_rhs(cond_stmt, zero);
                             lowered_count++;
                             if (opt_trace)
                                 inform(gimple_location(stmt), "ternary: lowered branch %s via ternary cmp", get_tree_code_name(code));
@@ -1745,22 +1769,23 @@ skip_cond_simplify:
                     if (lhs) {
                         tree lowered = lower_cond_expr_in_tree(lhs, &gsi);
                         if (lowered != lhs)
-                            gimple_cond_set_lhs(stmt, lowered);
+                            gimple_cond_set_lhs(cond_stmt, lowered);
                     }
                     if (rhs) {
                         tree lowered = lower_cond_expr_in_tree(rhs, &gsi);
                         if (lowered != rhs)
-                            gimple_cond_set_rhs(stmt, lowered);
+                            gimple_cond_set_rhs(cond_stmt, lowered);
                     }
                 }
 
-                if (is_gimple_return(stmt) && opt_lower)
+                if (is_return_stmt(stmt) && opt_lower)
                 {
-                    tree retval = gimple_return_retval(stmt);
+                    greturn *return_stmt = GIMPLE_CHECK2<greturn *>(stmt);
+                    tree retval = gimple_return_retval(return_stmt);
                     if (retval) {
                         tree lowered = lower_cond_expr_in_tree(retval, &gsi);
                         if (lowered != retval)
-                            gimple_return_set_retval(stmt, lowered);
+                            gimple_return_set_retval(return_stmt, lowered);
                     }
                 }
             }

@@ -202,6 +202,40 @@ static int ternary_trit_xor(int a, int b)
     return -1;
 }
 
+static int ternary_trit_majority(int a, int b, int c)
+{
+    if (a == b || a == c)
+        return a;
+    if (b == c)
+        return b;
+    return 0;
+}
+
+static uint64_t ternary_majority_u64(uint64_t a, uint64_t b, uint64_t c, unsigned trit_count)
+{
+    uint64_t out = 0;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int trit = ternary_trit_majority(ternary_get_trit_u64(a, i),
+                                          ternary_get_trit_u64(b, i),
+                                          ternary_get_trit_u64(c, i));
+        out = ternary_set_trit_u64(out, i, trit);
+    }
+    return out;
+}
+
+static unsigned __int128 ternary_majority_u128(unsigned __int128 a, unsigned __int128 b,
+                                               unsigned __int128 c, unsigned trit_count)
+{
+    unsigned __int128 out = 0;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int trit = ternary_trit_majority(ternary_get_trit_u128(a, i),
+                                          ternary_get_trit_u128(b, i),
+                                          ternary_get_trit_u128(c, i));
+        out = ternary_set_trit_u128(out, i, trit);
+    }
+    return out;
+}
+
 static uint64_t ternary_tritwise_op_u64(uint64_t a, uint64_t b, unsigned trit_count, int op)
 {
     uint64_t out = 0;
@@ -217,6 +251,214 @@ static uint64_t ternary_tritwise_op_u64(uint64_t a, uint64_t b, unsigned trit_co
             trit = ternary_trit_xor(ta, tb);
         out = ternary_set_trit_u64(out, i, trit);
     }
+    return out;
+}
+
+static int ternary_trit_implication(int antecedent, int consequent)
+{
+    if (antecedent == -1)
+        return 1;
+    if (antecedent == 0) {
+        if (consequent == -1)
+            return -1;
+        if (consequent == 0)
+            return 0;
+        return 1;
+    }
+    return consequent;
+}
+
+static uint64_t ternary_not_u64(uint64_t packed, unsigned trit_count)
+{
+    uint64_t out = 0;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int trit = ternary_get_trit_u64(packed, i);
+        int inverted = (trit == 0) ? 0 : -trit;
+        out = ternary_set_trit_u64(out, i, inverted);
+    }
+    return out;
+}
+
+static unsigned __int128 ternary_not_u128(unsigned __int128 packed, unsigned trit_count)
+{
+    unsigned __int128 out = 0;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int trit = ternary_get_trit_u128(packed, i);
+        int inverted = (trit == 0) ? 0 : -trit;
+        out = ternary_set_trit_u128(out, i, inverted);
+    }
+    return out;
+}
+
+static uint64_t ternary_muladd_u64(uint64_t a, uint64_t b, uint64_t c, unsigned trit_count)
+{
+    int64_t va = ternary_decode_u64(a, trit_count);
+    int64_t vb = ternary_decode_u64(b, trit_count);
+    int64_t vc = ternary_decode_u64(c, trit_count);
+    return (uint64_t)ternary_encode_u64(va * vb + vc, trit_count);
+}
+
+static unsigned __int128 ternary_muladd_u128(unsigned __int128 a, unsigned __int128 b,
+                                             unsigned __int128 c, unsigned trit_count)
+{
+    int64_t va = ternary_decode_u128(a, trit_count);
+    int64_t vb = ternary_decode_u128(b, trit_count);
+    int64_t vc = ternary_decode_u128(c, trit_count);
+    return ternary_encode_u128(va * vb + vc, trit_count);
+}
+
+static uint64_t ternary_round_u64(uint64_t packed, unsigned trit_count, unsigned drop)
+{
+    if (drop >= trit_count)
+        return 0;
+    uint64_t out = 0;
+    for (unsigned i = drop; i < trit_count; ++i) {
+        int trit = ternary_get_trit_u64(packed, i);
+        out = ternary_set_trit_u64(out, i - drop, trit);
+    }
+    return out;
+}
+
+static unsigned __int128 ternary_round_u128(unsigned __int128 packed, unsigned trit_count,
+                                            unsigned drop)
+{
+    if (drop >= trit_count)
+        return 0;
+    unsigned __int128 out = 0;
+    for (unsigned i = drop; i < trit_count; ++i) {
+        int trit = ternary_get_trit_u128(packed, i);
+        out = ternary_set_trit_u128(out, i - drop, trit);
+    }
+    return out;
+}
+
+static uint64_t ternary_normalize_u64(uint64_t packed, unsigned trit_count)
+{
+    uint64_t out = packed;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        unsigned bits = (unsigned)((packed >> (2U * i)) & 0x3U);
+        if (bits == 0x3U) {
+            out &= ~(0x3ULL << (2U * i));
+            out |= (0x1ULL << (2U * i));
+        }
+    }
+    return out;
+}
+
+static unsigned __int128 ternary_normalize_u128(unsigned __int128 packed, unsigned trit_count)
+{
+    unsigned __int128 out = packed;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        unsigned bits = (unsigned)((packed >> (2U * i)) & 0x3U);
+        if (bits == 0x3U) {
+            unsigned __int128 mask = (unsigned __int128)0x3U << (2U * i);
+            out &= ~mask;
+            out |= (unsigned __int128)0x1U << (2U * i);
+        }
+    }
+    return out;
+}
+
+static uint64_t ternary_tbias_u64(uint64_t packed, unsigned trit_count, int64_t bias)
+{
+    int64_t value = ternary_decode_u64(packed, trit_count);
+    return (uint64_t)ternary_encode_u64(value + bias, trit_count);
+}
+
+static unsigned __int128 ternary_tbias_u128(unsigned __int128 packed, unsigned trit_count, int64_t bias)
+{
+    int64_t value = ternary_decode_u128(packed, trit_count);
+    return ternary_encode_u128(value + bias, trit_count);
+}
+
+static int ternary_branch_target(TERNARY_COND_T cond, int neg_target, int zero_target, int pos_target)
+{
+    if (cond < 0)
+        return neg_target;
+    if (cond > 0)
+        return pos_target;
+    return zero_target;
+}
+
+static int ternary_signjmp_u64(uint64_t packed, unsigned trit_count,
+                               int neg_target, int zero_target, int pos_target)
+{
+    int64_t value = ternary_decode_u64(packed, trit_count);
+    if (value < 0)
+        return neg_target;
+    if (value > 0)
+        return pos_target;
+    return zero_target;
+}
+
+static int ternary_signjmp_u128(unsigned __int128 packed, unsigned trit_count,
+                                int neg_target, int zero_target, int pos_target)
+{
+    int64_t value = ternary_decode_u128(packed, trit_count);
+    if (value < 0)
+        return neg_target;
+    if (value > 0)
+        return pos_target;
+    return zero_target;
+}
+
+static uint64_t ternary_implication_u64(uint64_t a, uint64_t b, unsigned trit_count)
+{
+    uint64_t out = 0;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int trit = ternary_trit_implication(ternary_get_trit_u64(a, i),
+                                             ternary_get_trit_u64(b, i));
+        out = ternary_set_trit_u64(out, i, trit);
+    }
+    return out;
+}
+
+static unsigned __int128 ternary_implication_u128(unsigned __int128 a, unsigned __int128 b,
+                                                  unsigned trit_count)
+{
+    unsigned __int128 out = 0;
+    for (unsigned i = 0; i < trit_count; ++i) {
+        int trit = ternary_trit_implication(ternary_get_trit_u128(a, i),
+                                             ternary_get_trit_u128(b, i));
+        out = ternary_set_trit_u128(out, i, trit);
+    }
+    return out;
+}
+
+static int ternary_quantize_float(float value, float threshold)
+{
+    if (value > threshold)
+        return 1;
+    if (value < -threshold)
+        return -1;
+    return 0;
+}
+
+static uint64_t ternary_quantize_vector_float(float value, float threshold, unsigned trit_count)
+{
+    int trit = ternary_quantize_float(value, threshold);
+    uint64_t out = 0;
+    for (unsigned i = 0; i < trit_count; ++i)
+        out = ternary_set_trit_u64(out, i, trit);
+    return out;
+}
+
+static int ternary_quantize_double(double value, double threshold)
+{
+    if (value > threshold)
+        return 1;
+    if (value < -threshold)
+        return -1;
+    return 0;
+}
+
+static unsigned __int128 ternary_quantize_vector_double(double value, double threshold,
+                                                        unsigned trit_count)
+{
+    int trit = ternary_quantize_double(value, threshold);
+    unsigned __int128 out = 0;
+    for (unsigned i = 0; i < trit_count; ++i)
+        out = ternary_set_trit_u128(out, i, trit);
     return out;
 }
 
@@ -534,6 +776,61 @@ t32_t __ternary_xor_t32(t32_t a, t32_t b)
     return (t32_t)ternary_tritwise_op_u64(a, b, 32, 2);
 }
 
+t32_t __ternary_tmin_t32(t32_t a, t32_t b)
+{
+    return (t32_t)ternary_tritwise_op_u64(a, b, 32, 0);
+}
+
+t32_t __ternary_tmax_t32(t32_t a, t32_t b)
+{
+    return (t32_t)ternary_tritwise_op_u64(a, b, 32, 1);
+}
+
+t32_t __ternary_tmaj_t32(t32_t a, t32_t b, t32_t c)
+{
+    return (t32_t)ternary_majority_u64(a, b, c, 32);
+}
+
+t32_t __ternary_tlimp_t32(t32_t antecedent, t32_t consequent)
+{
+    return (t32_t)ternary_implication_u64(antecedent, consequent, 32);
+}
+
+t32_t __ternary_tquant_t32(float value, float threshold)
+{
+    return (t32_t)ternary_quantize_vector_float(value, threshold, 32);
+}
+
+t32_t __ternary_tnot_t32(t32_t a)
+{
+    return (t32_t)ternary_not_u64(a, 32);
+}
+
+t32_t __ternary_tinv_t32(t32_t a)
+{
+    return __ternary_tnot_t32(a);
+}
+
+t32_t __ternary_tmuladd_t32(t32_t a, t32_t b, t32_t c)
+{
+    return (t32_t)ternary_muladd_u64(a, b, c, 32);
+}
+
+t32_t __ternary_tround_t32(t32_t a, unsigned drop)
+{
+    return (t32_t)ternary_round_u64(a, 32, drop);
+}
+
+t32_t __ternary_tnormalize_t32(t32_t a)
+{
+    return (t32_t)ternary_normalize_u64(a, 32);
+}
+
+t32_t __ternary_tbias_t32(t32_t a, int64_t bias)
+{
+    return (t32_t)ternary_tbias_u64(a, 32, bias);
+}
+
 t32_t __ternary_shl_t32(t32_t a, int shift)
 {
     return (t32_t)ternary_shift_left_u64(a, 32, (unsigned)shift);
@@ -642,6 +939,61 @@ t64_t __ternary_xor_t64(t64_t a, t64_t b)
     return (t64_t)ternary_tritwise_op_u128(a, b, 64, 2);
 }
 
+t64_t __ternary_tmin_t64(t64_t a, t64_t b)
+{
+    return (t64_t)ternary_tritwise_op_u128(a, b, 64, 0);
+}
+
+t64_t __ternary_tmax_t64(t64_t a, t64_t b)
+{
+    return (t64_t)ternary_tritwise_op_u128(a, b, 64, 1);
+}
+
+t64_t __ternary_tmaj_t64(t64_t a, t64_t b, t64_t c)
+{
+    return (t64_t)ternary_majority_u128(a, b, c, 64);
+}
+
+t64_t __ternary_tlimp_t64(t64_t antecedent, t64_t consequent)
+{
+    return (t64_t)ternary_implication_u128(antecedent, consequent, 64);
+}
+
+t64_t __ternary_tquant_t64(double value, double threshold)
+{
+    return (t64_t)ternary_quantize_vector_double(value, threshold, 64);
+}
+
+t64_t __ternary_tnot_t64(t64_t a)
+{
+    return (t64_t)ternary_not_u128(a, 64);
+}
+
+t64_t __ternary_tinv_t64(t64_t a)
+{
+    return __ternary_tnot_t64(a);
+}
+
+t64_t __ternary_tmuladd_t64(t64_t a, t64_t b, t64_t c)
+{
+    return (t64_t)ternary_muladd_u128(a, b, c, 64);
+}
+
+t64_t __ternary_tround_t64(t64_t a, unsigned drop)
+{
+    return (t64_t)ternary_round_u128(a, 64, drop);
+}
+
+t64_t __ternary_tnormalize_t64(t64_t a)
+{
+    return (t64_t)ternary_normalize_u128(a, 64);
+}
+
+t64_t __ternary_tbias_t64(t64_t a, int64_t bias)
+{
+    return (t64_t)ternary_tbias_u128(a, 64, bias);
+}
+
 t64_t __ternary_shl_t64(t64_t a, int shift)
 {
     return (t64_t)ternary_shift_left_u128(a, 64, (unsigned)shift);
@@ -686,6 +1038,21 @@ int __ternary_cmp_t64(t64_t a, t64_t b)
     if (va > vb)
         return 1;
     return 0;
+}
+
+int __ternary_tbranch(TERNARY_COND_T cond, int neg_target, int zero_target, int pos_target)
+{
+    return ternary_branch_target(cond, neg_target, zero_target, pos_target);
+}
+
+int __ternary_tsignjmp_t32(t32_t reg, int neg_target, int zero_target, int pos_target)
+{
+    return ternary_signjmp_u64(reg, 32, neg_target, zero_target, pos_target);
+}
+
+int __ternary_tsignjmp_t64(t64_t reg, int neg_target, int zero_target, int pos_target)
+{
+    return ternary_signjmp_u128(reg, 64, neg_target, zero_target, pos_target);
 }
 
 #undef __ternary_add
@@ -768,6 +1135,14 @@ int __ternary_cmp_t64(t64_t a, t64_t b)
     t32_t __ternary_tb2t_t32(int64_t v) { return TERNARY_RUNTIME_SYM(tb2t_t32)(v); }
 #define TERNARY_COMPAT_T32_TT2B() \
     int64_t __ternary_tt2b_t32(t32_t v) { return TERNARY_RUNTIME_SYM(tt2b_t32)(v); }
+#define TERNARY_COMPAT_T32_IMP() \
+    t32_t __ternary_tlimp_t32(t32_t antecedent, t32_t consequent) { \
+        return TERNARY_RUNTIME_SYM(tlimp_t32)(antecedent, consequent); \
+    }
+#define TERNARY_COMPAT_T32_QUANT() \
+    t32_t __ternary_tquant_t32(float value, float threshold) { \
+        return TERNARY_RUNTIME_SYM(tquant_t32)(value, threshold); \
+    }
 #define TERNARY_COMPAT_T32_CMP() \
     int __ternary_cmp_t32(t32_t a, t32_t b) { return TERNARY_RUNTIME_SYM(cmp_t32)(a, b); }
 
@@ -785,8 +1160,26 @@ int __ternary_cmp_t64(t64_t a, t64_t b)
     t64_t __ternary_tb2t_t64(int64_t v) { return TERNARY_RUNTIME_SYM(tb2t_t64)(v); }
 #define TERNARY_COMPAT_T64_TT2B() \
     int64_t __ternary_tt2b_t64(t64_t v) { return TERNARY_RUNTIME_SYM(tt2b_t64)(v); }
+#define TERNARY_COMPAT_T64_IMP() \
+    t64_t __ternary_tlimp_t64(t64_t antecedent, t64_t consequent) { \
+        return TERNARY_RUNTIME_SYM(tlimp_t64)(antecedent, consequent); \
+    }
+#define TERNARY_COMPAT_T64_QUANT() \
+    t64_t __ternary_tquant_t64(double value, double threshold) { \
+        return TERNARY_RUNTIME_SYM(tquant_t64)(value, threshold); \
+    }
 #define TERNARY_COMPAT_T64_CMP() \
     int __ternary_cmp_t64(t64_t a, t64_t b) { return TERNARY_RUNTIME_SYM(cmp_t64)(a, b); }
+
+#define TERNARY_COMPAT_T32_TERNARY(name) \
+    t32_t __ternary_##name##_t32(t32_t a, t32_t b, t32_t c) { \
+        return TERNARY_RUNTIME_SYM(name##_t32)(a, b, c); \
+    }
+
+#define TERNARY_COMPAT_T64_TERNARY(name) \
+    t64_t __ternary_##name##_t64(t64_t a, t64_t b, t64_t c) { \
+        return TERNARY_RUNTIME_SYM(name##_t64)(a, b, c); \
+    }
 
 TERNARY_COMPAT_SCALAR_BIN(add)
 TERNARY_COMPAT_SCALAR_BIN(sub)
@@ -819,6 +1212,11 @@ TERNARY_COMPAT_T32_UNARY(neg)
 TERNARY_COMPAT_T32_BIN(and)
 TERNARY_COMPAT_T32_BIN(or)
 TERNARY_COMPAT_T32_BIN(xor)
+TERNARY_COMPAT_T32_BIN(tmin)
+TERNARY_COMPAT_T32_BIN(tmax)
+TERNARY_COMPAT_T32_TERNARY(tmaj)
+TERNARY_COMPAT_T32_IMP()
+TERNARY_COMPAT_T32_QUANT()
 TERNARY_COMPAT_T32_SHIFT(shl)
 TERNARY_COMPAT_T32_SHIFT(shr)
 TERNARY_COMPAT_T32_SHIFT(rol)
@@ -837,6 +1235,11 @@ TERNARY_COMPAT_T64_UNARY(neg)
 TERNARY_COMPAT_T64_BIN(and)
 TERNARY_COMPAT_T64_BIN(or)
 TERNARY_COMPAT_T64_BIN(xor)
+TERNARY_COMPAT_T64_BIN(tmin)
+TERNARY_COMPAT_T64_BIN(tmax)
+TERNARY_COMPAT_T64_TERNARY(tmaj)
+TERNARY_COMPAT_T64_IMP()
+TERNARY_COMPAT_T64_QUANT()
 TERNARY_COMPAT_T64_SHIFT(shl)
 TERNARY_COMPAT_T64_SHIFT(shr)
 TERNARY_COMPAT_T64_SHIFT(rol)
@@ -856,6 +1259,8 @@ TERNARY_COMPAT_T64_CMP()
 #undef TERNARY_COMPAT_T32_TB2T
 #undef TERNARY_COMPAT_T32_TT2B
 #undef TERNARY_COMPAT_T32_CMP
+#undef TERNARY_COMPAT_T32_IMP
+#undef TERNARY_COMPAT_T32_QUANT
 #undef TERNARY_COMPAT_T64_BIN
 #undef TERNARY_COMPAT_T64_UNARY
 #undef TERNARY_COMPAT_T64_SHIFT
@@ -863,4 +1268,8 @@ TERNARY_COMPAT_T64_CMP()
 #undef TERNARY_COMPAT_T64_TB2T
 #undef TERNARY_COMPAT_T64_TT2B
 #undef TERNARY_COMPAT_T64_CMP
+#undef TERNARY_COMPAT_T64_IMP
+#undef TERNARY_COMPAT_T64_QUANT
+#undef TERNARY_COMPAT_T32_TERNARY
+#undef TERNARY_COMPAT_T64_TERNARY
 #endif

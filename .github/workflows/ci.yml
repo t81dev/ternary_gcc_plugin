@@ -24,6 +24,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Check helper docs
+      run: make check-helper-docs
+
     - name: Install GCC ${{ matrix.gcc-version }}
       if: matrix.os == 'ubuntu-latest'
       run: |
