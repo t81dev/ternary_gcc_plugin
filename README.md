@@ -234,6 +234,7 @@ See `examples/` for demo programs covering basic usage, calculator-style logic, 
 - `SPECIFICATION.md` documents the helper ABI, ISA mnemonics, and execution model.
 - `ROADMAP.md` sketches future work (CI, ABI stability, runtime verification).
 - `ENCODING.md` details the tryte-level encoding for the ISA.
+- `docs/abi-contract-validation.md` defines ABI drift policy and the reproducible validation command.
 - Run `./make_release.sh` to build a tarball release with headers and plugin artifacts.
 
 ## Contributing
